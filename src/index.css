@@ -1,0 +1,192 @@
+@import "tailwindcss";
+@import "swiper/css";
+@import "swiper/css/pagination";
+
+@theme {
+  --font-sans: Mukta, "Mukta Fallback", sans-serif;
+  --font-serif: Mukta, "Mukta Fallback", sans-serif;
+  --font-mono: Mukta, "Mukta Fallback", monospace, sans-serif;
+}
+
+@layer base {
+
+  *,
+  ::before,
+  ::after {
+    font-family: Mukta, "Mukta Fallback", sans-serif;
+  }
+
+  /* Keep inline SVGs constrained when Tailwind utilities are unavailable during HMR. */
+  svg {
+    max-width: 100%;
+  }
+
+  body {
+    background-color: #ffffff;
+    color: #111827;
+    font-family: Mukta, "Mukta Fallback", sans-serif !important;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  input,
+  button,
+  select,
+  textarea,
+  p,
+  span,
+  div,
+  a,
+  li,
+  th,
+  td,
+  label,
+  .font-serif,
+  .font-sans,
+  .font-mono {
+    font-family: Mukta, "Mukta Fallback", sans-serif !important;
+  }
+}
+
+/*
+ * Explicit dimensions for the editorial accent SVG. Tailwind normally supplies
+ * these through `w-9 sm:w-11 h-2`, but keeping a small CSS fallback prevents the
+ * browser's default 300x150 SVG size from taking over if generated utilities
+ * are briefly unavailable during development/HMR.
+ */
+.section-heading-accent {
+  display: block;
+  width: 2.25rem;
+  height: 0.5rem;
+  max-width: 2.75rem;
+}
+
+@media (min-width: 640px) {
+  .section-heading-accent {
+    width: 2.75rem;
+  }
+}
+
+/* Shared space between the public navbar and inline breadcrumb trails. */
+.breadcrumb-page-main {
+  padding-top: clamp(2rem, 4vw, 3rem);
+}
+
+/* Keep the existing breadcrumb structure compact below the public navbar on
+ * phones and tablets without changing desktop spacing. */
+@media (max-width: 1023px) {
+  .breadcrumb-page-main {
+    padding-top: 3rem;
+  }
+
+  /* Add a restrained touch/focus state to the primary navigation. */
+  #primary-category-navbar .mobile-tablet-nav-link:active,
+  #primary-category-navbar .mobile-tablet-nav-link:focus-visible {
+    color: #db2777;
+    transition-duration: 250ms;
+  }
+
+  #primary-category-navbar .mobile-tablet-nav-link:active .mobile-tablet-nav-icon,
+  #primary-category-navbar .mobile-tablet-nav-link:focus-visible .mobile-tablet-nav-icon {
+    color: #db2777;
+    transition-duration: 250ms;
+  }
+}
+
+/* Homepage-only breathing room below the public navbar. */
+#homepage-main-content {
+  padding-top: clamp(4rem, 7vw, 7rem);
+}
+
+/* Editorial title hover: retain the existing title color and underline the text only. */
+#homepage-main-content [id*="title-link"] {
+  color: #111827 !important;
+  text-decoration: none;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 180ms ease;
+}
+
+#homepage-main-content [id*="title-link"] h2,
+#homepage-main-content [id*="title-link"] h3,
+#homepage-main-content [id*="title-link"] h4 {
+  color: inherit;
+}
+
+#homepage-main-content [id*="title-link"]:hover,
+#homepage-main-content [id*="title-link"]:focus-visible {
+  color: #111827 !important;
+  text-decoration-line: underline;
+}
+
+/* Swiper custom pagination styles */
+.hero-bullet,
+.custom-hero-pagination .hero-bullet {
+  display: inline-block;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  background-color: #cbd5e1 !important;
+  transition: background-color 0.2s ease !important;
+  cursor: pointer;
+  margin: 0 4px !important;
+  transform: none !important;
+  flex-shrink: 0;
+}
+
+.hero-bullet:hover,
+.custom-hero-pagination .hero-bullet:hover {
+  background-color: #9ca3af !important;
+}
+
+.hero-bullet.hero-bullet-active,
+.hero-bullet.swiper-pagination-bullet-active,
+.custom-hero-pagination .hero-bullet-active,
+.custom-hero-pagination .swiper-pagination-bullet-active {
+  background-color: #db2777 !important;
+  width: 8px !important;
+  height: 8px !important;
+  border-radius: 50% !important;
+  transform: none !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d6d3d1;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a29e;
+}
+
+/* Hide scrollbar for Chrome, Safari and Opera */
+.no-scrollbar::-webkit-scrollbar,
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+
+/* Hide scrollbar for IE, Edge and Firefox */
+.no-scrollbar,
+.scrollbar-none {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
