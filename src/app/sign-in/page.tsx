@@ -252,50 +252,7 @@ function SignInContent() {
             </div>
           </form>
 
-          {/* Quick Demo Selector */}
-          <div className="mt-6 pt-6 border-t border-stone-800">
-            <p className="text-[11px] uppercase tracking-wider text-stone-400 font-semibold mb-2.5 flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              Quick Demo Accounts
-            </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('admin')}
-                className="text-left p-2 rounded-lg bg-stone-950/80 hover:bg-stone-800 border border-stone-800 transition text-xs"
-              >
-                <div className="font-semibold text-amber-400 flex items-center justify-between">
-                  <span>Admin</span>
-                  <ShieldCheck className="w-3 h-3" />
-                </div>
-                <div className="text-[10px] text-stone-400 font-mono truncate">admin@sereia.news</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('editor')}
-                className="text-left p-2 rounded-lg bg-stone-950/80 hover:bg-stone-800 border border-stone-800 transition text-xs"
-              >
-                <div className="font-semibold text-stone-200">Editor</div>
-                <div className="text-[10px] text-stone-400 font-mono truncate">editor@sereia.news</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('author')}
-                className="text-left p-2 rounded-lg bg-stone-950/80 hover:bg-stone-800 border border-stone-800 transition text-xs"
-              >
-                <div className="font-semibold text-stone-200">Author</div>
-                <div className="text-[10px] text-stone-400 font-mono truncate">author@sereia.news</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => setDemoCredentials('subscriber')}
-                className="text-left p-2 rounded-lg bg-stone-950/80 hover:bg-stone-800 border border-stone-800 transition text-xs"
-              >
-                <div className="font-semibold text-stone-200">Subscriber</div>
-                <div className="text-[10px] text-stone-400 font-mono truncate">user@sereia.news</div>
-              </button>
-            </div>
-          </div>
+          
         </div>
 
         {/* Footer Link */}

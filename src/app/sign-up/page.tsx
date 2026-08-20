@@ -63,6 +63,11 @@ export default function SignUpPage() {
         return;
       }
 
+      if (!result.requiresVerification) {
+        router.push('/sign-in?registered=true');
+        return;
+      }
+
       setRegisteredEmail(email.trim());
       setIsSuccess(true);
     } catch (err: any) {

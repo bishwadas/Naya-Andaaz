@@ -9,7 +9,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string; unverified?: boolean; email?: string; user?: User }>;
-  register: (data: { name: string; email: string; password: string; confirmPassword: string }) => Promise<{ success: boolean; message?: string; error?: string }>;
+  register: (data: { name: string; email: string; password: string; confirmPassword: string }) => Promise<{ success: boolean; message?: string; error?: string; requiresVerification?: boolean }>;
   forgotPassword: (email: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   resetPassword: (token: string, password: string, confirmPassword: string) => Promise<{ success: boolean; message?: string; error?: string }>;
   verifyEmail: (token: string) => Promise<{ success: boolean; message?: string; error?: string; expired?: boolean }>;
@@ -95,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string;
     password: string;
     confirmPassword: string;
-  }): Promise<{ success: boolean; message?: string; error?: string }> => {
+  }): Promise<{ success: boolean; message?: string; error?: string; requiresVerification?: boolean }> => {
     try {
       const res = await fetch('/api/auth/register', {
         method: 'POST',
@@ -108,7 +108,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: result.error || 'Registration failed' };
       }
 
-      return { success: true, message: result.message };
+      return { success: true, message: result.message, requiresVerification: result.requiresVerification };
     } catch (err: any) {
       return { success: false, error: err.message || 'Registration request failed' };
     }

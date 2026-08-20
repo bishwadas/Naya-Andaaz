@@ -3,6 +3,7 @@ import { getUserByEmail, createUser } from '@/db/repository';
 import { hashPassword } from '@/lib/auth';
 import { createOtpForEmail } from '@/lib/otp';
 import { sendOtpEmail } from '@/lib/email';
+import { isEmailVerificationEnabled } from '@/lib/auth-config';
 import { db } from '@/db';
 import { users } from '@/db/schema';
 import { eq } from 'drizzle-orm';
@@ -16,6 +17,7 @@ function isValidEmail(email: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    const emailVerificationEnabled = isEmailVerificationEnabled();
     const body = await req.json().catch(() => ({}));
     const { name, email, password, confirmPassword } = body;
 
@@ -115,7 +117,8 @@ export async function POST(req: NextRequest) {
     const baseUsername = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9._]/g, '');
     const username = `${baseUsername || 'user'}_${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 8. Create user record (marked as unverified)
+    // 8. Create the user. In development mode, skip the email step by marking
+    // the account verified immediately; verification columns remain intact.
     let newUser;
     try {
       newUser = await createUser({
@@ -125,7 +128,7 @@ export async function POST(req: NextRequest) {
         passwordHash,
         role: 'subscriber',
         isActive: true,
-        emailVerified: false,
+        emailVerified: !emailVerificationEnabled,
       });
     } catch (createErr: any) {
       console.error('User creation failure:', createErr);
@@ -135,36 +138,41 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 9. Generate and send 6-digit OTP
-    const otpResult = await createOtpForEmail(cleanEmail, 'signup');
-    if (!otpResult.success || !otpResult.otp) {
-      return NextResponse.json(
-        { success: false, error: otpResult.error || 'OTP generation/storage failure.' },
-        { status: 500 }
-      );
-    }
+    if (emailVerificationEnabled) {
+      // 9. Generate and send 6-digit OTP only when verification is enabled.
+      const otpResult = await createOtpForEmail(cleanEmail, 'signup');
+      if (!otpResult.success || !otpResult.otp) {
+        return NextResponse.json(
+          { success: false, error: otpResult.error || 'OTP generation/storage failure.' },
+          { status: 500 }
+        );
+      }
 
-    // 10. Send verification email via Resend
-    const emailResult = await sendOtpEmail({
-      to: cleanEmail,
-      name: name.trim(),
-      otp: otpResult.otp,
-      purpose: 'signup',
-    });
+      // 10. Send verification email via the existing Resend integration.
+      const emailResult = await sendOtpEmail({
+        to: cleanEmail,
+        name: name.trim(),
+        otp: otpResult.otp,
+        purpose: 'signup',
+      });
 
-    if (!emailResult.success) {
-      return NextResponse.json(
-        { success: false, error: `Resend API failure: ${emailResult.error || 'Failed to send verification email.'}` },
-        { status: 500 }
-      );
+      if (!emailResult.success) {
+        return NextResponse.json(
+          { success: false, error: `Resend API failure: ${emailResult.error || 'Failed to send verification email.'}` },
+          { status: 500 }
+        );
+      }
     }
 
     return NextResponse.json(
       {
         success: true,
-        message: 'OTP sent successfully. Please check your inbox for the 6-digit code.',
+        message: emailVerificationEnabled
+          ? 'OTP sent successfully. Please check your inbox for the 6-digit code.'
+          : 'Account created successfully. You can sign in now.',
         userId: newUser.id,
         email: cleanEmail,
+        requiresVerification: emailVerificationEnabled,
       },
       { status: 201 }
     );
