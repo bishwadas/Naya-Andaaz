@@ -57,7 +57,10 @@ export default function FeaturedHero({ posts }: FeaturedHeroProps) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1.2fr] gap-6 lg:gap-7 items-start" id="desktop-hero-supporting-posts">
+        <div
+  className="hidden lg:grid lg:grid-cols-[1.2fr_1.2fr] gap-6 lg:gap-7 items-start"
+  id="desktop-hero-supporting-posts"
+>
           {supportingPosts.map((post) => {
             const catSlug = post.subCategory?.slug || post.category?.slug || '';
             const catName = post.subCategory?.name || post.category?.name || 'Featured';
