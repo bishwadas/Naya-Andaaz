@@ -1,5 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
+import { Facebook, Instagram, Youtube, Twitter } from 'lucide-react';
+import { getCategoryUrl } from '@/lib/categories';
 import { Category, SiteSettings } from '@/types';
 
 interface FooterProps {
@@ -8,55 +10,65 @@ interface FooterProps {
 }
 
 export const Footer: React.FC<FooterProps> = ({ settings, categories }) => {
+  const parentCategories = categories.filter((category) => !category.parentId).slice(0, 10);
+  const socialLinks = [
+    { href: settings?.facebookUrl, label: 'Facebook', icon: Facebook },
+    { href: settings?.instagramUrl, label: 'Instagram', icon: Instagram },
+    { href: settings?.twitterUrl, label: 'X / Twitter', icon: Twitter },
+    { href: settings?.youtubeUrl, label: 'YouTube', icon: Youtube },
+  ].filter((social): social is typeof social & { href: string } => Boolean(social.href));
+
   return (
-    <footer className="bg-stone-950 text-stone-300 border-t border-stone-800 pt-16 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
-        <div className="space-y-4 md:col-span-1">
-          <div className="font-serif text-2xl font-black text-amber-300 tracking-wider">
-            {settings?.siteTitle || 'SEREIA'}
+    <footer className="bg-[#101827] text-[#9eabc0] border-t border-[#1f2b3d]">
+      <div className="mx-auto max-w-[1200px] px-10 py-[72px] sm:px-12 lg:px-0">
+        <div className="grid grid-cols-1 gap-12 md:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)_minmax(150px,.65fr)] md:gap-16 lg:gap-24">
+          <div className="max-w-[550px]">
+            {settings?.logo ? (
+              <img src={settings.logo} alt={settings.siteName || 'Site logo'} className="h-auto max-h-12 w-auto max-w-[240px] object-contain object-left" />
+            ) : (
+              <div className="text-4xl font-black italic tracking-tight text-white">{settings?.siteTitle || settings?.siteName || 'SEREIA'}</div>
+            )}
+            <p className="mt-10 max-w-[550px] text-[18px] leading-[1.9] text-[#9eabc0]">
+              {settings?.tagline || settings?.siteDescription || 'Global journalism, fearless investigations, and cultural dispatches from the front lines of discovery.'}
+            </p>
+            {socialLinks.length > 0 && (
+              <div className="mt-8 flex items-center gap-7">
+                {socialLinks.map(({ href, label, icon: Icon }) => (
+                  <a key={label} href={href} target="_blank" rel="noreferrer" aria-label={label} className="text-[#9eabc0] transition hover:text-white">
+                    <Icon className="h-6 w-6" strokeWidth={1.8} />
+                  </a>
+                ))}
+              </div>
+            )}
           </div>
-          <p className="text-sm text-stone-400 font-serif leading-relaxed">
-            {settings?.tagline || settings?.siteDescription || 'Global journalism, fearless investigations, and cultural dispatches from the front lines of discovery.'}
-          </p>
-          <div className="text-xs text-stone-500">
-            &copy; {new Date().getFullYear()} Sereia Publishing Group. All rights reserved.
+
+          <div>
+            <h4 className="text-[24px] font-bold leading-none text-white">Categories</h4>
+            <ul className="mt-8 grid grid-cols-2 gap-x-8 gap-y-4 text-[17px] leading-tight">
+              {parentCategories.map((category) => (
+                <li key={category.id}>
+                  <Link href={getCategoryUrl(category, categories)} className="transition hover:text-white">{category.name}</Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-[24px] font-bold leading-none text-white">Legal</h4>
+            <ul className="mt-8 space-y-5 text-[17px] leading-tight">
+              <li><Link href="/page/about-us" className="transition hover:text-white">About Us</Link></li>
+              <li><Link href="/page/terms-and-conditions" className="transition hover:text-white">Terms &amp; Conditions</Link></li>
+              <li><Link href="/page/privacy-policy" className="transition hover:text-white">Privacy Policy</Link></li>
+            </ul>
           </div>
         </div>
 
-        <div>
-          <h4 className="font-serif text-white font-bold mb-4 tracking-wider text-sm uppercase">Sections</h4>
-          <ul className="space-y-2 text-sm">
-            {categories.map((cat) => (
-              <li key={cat.id}>
-                <Link href={`/${cat.slug}`} className="hover:text-amber-300 transition">
-                  {cat.name}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-serif text-white font-bold mb-4 tracking-wider text-sm uppercase">Gazette</h4>
-          <ul className="space-y-2 text-sm">
-            <li><Link href="/page/about" className="hover:text-amber-300 transition">About Us</Link></li>
-            <li><Link href="/page/contact" className="hover:text-amber-300 transition">Contact & Tips</Link></li>
-            <li><Link href="/page/editorial-guidelines" className="hover:text-amber-300 transition">Editorial Ethics</Link></li>
-            <li><Link href="/page/privacy" className="hover:text-amber-300 transition">Privacy Policy</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <h4 className="font-serif text-white font-bold mb-4 tracking-wider text-sm uppercase">Administration</h4>
-          <p className="text-xs text-stone-400 mb-4">
-            Secure enterprise CMS portal for editorial board members, editors, and contributing journalists.
-          </p>
-          <Link
-            href="/admin"
-            className="inline-block px-4 py-2 bg-stone-900 hover:bg-stone-800 text-stone-200 border border-stone-700 font-semibold rounded text-xs transition"
-          >
-            Admin CMS Login
+        <div className="mt-[68px] border-t border-[#293548] pt-10 text-center text-[16px] text-[#9eabc0]">
+          Copyright © {new Date().getFullYear()}{' '}
+          <Link href="/" className="transition hover:text-white">
+            {settings?.siteName || settings?.siteTitle || 'SEREIA'}
           </Link>
+          , Inc. All rights reserved.
         </div>
       </div>
     </footer>

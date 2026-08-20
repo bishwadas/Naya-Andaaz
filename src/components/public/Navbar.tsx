@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { Category, MenuItem, SiteSettings } from '@/types';
 import { useAuth } from '@/lib/auth-client';
+import { getCategoryUrl } from '@/lib/categories';
 
 interface NavbarProps {
   categories: Category[];
@@ -240,6 +241,13 @@ export const Navbar: React.FC<NavbarProps> = ({
           { id: 'def_career', label: 'Career & Finance', url: '/career-finance' },
           { id: 'def_rel', label: 'Relationships', url: '/relationships' },
         ];
+
+  const getNavItemUrl = (item: Pick<MenuItem, 'url' | 'categorySlug'>) => {
+    const linkedCategory = item.categorySlug
+      ? categories.find((category) => category.slug.toLowerCase() === item.categorySlug?.toLowerCase())
+      : undefined;
+    return linkedCategory ? getCategoryUrl(linkedCategory, categories) : item.url;
+  };
 
   // Group categories for drawer
   const drawerParentCats = React.useMemo(() => {
@@ -490,17 +498,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                   return true;
                 })
                 .map((item) => {
+                  const itemUrl = getNavItemUrl(item);
                   const isActive =
-                    item.url === '/'
+                    itemUrl === '/'
                       ? pathname === '/'
-                      : pathname.startsWith(item.url) || pathname.includes((item as any).categorySlug || '');
+                      : pathname.startsWith(itemUrl) || pathname.includes((item as any).categorySlug || '');
 
                   const categoryIcon = getCategoryIcon(item.label);
 
                   return (
                     <Link
                       key={item.id || item.url}
-                      href={item.url}
+                      href={itemUrl}
                       className="mobile-tablet-nav-link group shrink-0 inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 text-[11.5px] sm:text-[12px] md:text-[12.5px] font-bold uppercase tracking-wider whitespace-nowrap text-black hover:text-[#db2777] transition-colors duration-200"
                     >
                       <span className="mobile-tablet-nav-icon text-black group-hover:text-[#db2777] transition-colors duration-200">
@@ -629,7 +638,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                   toggleCategoryExpand(cat.slug);
                                 }
                               } else {
-                                router.push(`/${cat.slug}`);
+                                router.push(getCategoryUrl(cat, categories));
                                 setMobileDrawerOpen(false);
                               }
                             }}
@@ -644,7 +653,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                                 {getCategoryIcon(cat.name)}
                               </span>
                               <Link
-                                href={`/${cat.slug}`}
+                                href={getCategoryUrl(cat, categories)}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setMobileDrawerOpen(false);
@@ -683,7 +692,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                               {top5Subcats.map((sub) => (
                                 <Link
                                   key={`drawer-sub-${sub.id || sub.slug}`}
-                                  href={`/${sub.slug}`}
+                                  href={getCategoryUrl(sub, categories)}
                                   onClick={() => setMobileDrawerOpen(false)}
                                   className="flex items-center gap-2 py-1 text-xs sm:text-[13px] font-medium text-stone-700 hover:text-[#db2777] transition"
                                 >

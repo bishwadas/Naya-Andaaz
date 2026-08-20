@@ -104,7 +104,7 @@ export default async function HomePage() {
       {/* Main Homepage Layout */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-6 sm:space-y-8" id="homepage-main-content">
         {/* SECTION 1: Shared Hero Section */}
-        <FeaturedHero posts={allPublishedPosts} />
+        <FeaturedHero posts={allPublishedPosts} categories={categories} />
 
         {/* SECTION 2: Entertainment (Parent category + Subcategories: Movies News & Updates, Television & OTT, Celebrities) */}
         <CategorySection

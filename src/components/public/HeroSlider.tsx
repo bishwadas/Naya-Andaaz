@@ -4,16 +4,18 @@ import React from 'react';
 import Link from 'next/link';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
-import { Post } from '@/types';
+import { Category, Post } from '@/types';
+import { getPostCategoryUrl } from '@/lib/categories';
 
 import 'swiper/css';
 import 'swiper/css/pagination';
 
 interface HeroSliderProps {
   posts: Post[];
+  categories: Category[];
 }
 
-export const HeroSlider: React.FC<HeroSliderProps> = ({ posts }) => {
+export const HeroSlider: React.FC<HeroSliderProps> = ({ posts, categories }) => {
   if (!posts || posts.length === 0) return null;
 
   // Exactly 6 unique posts for the slider
@@ -79,7 +81,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ posts }) => {
                   {/* Category label is clickable linking to category page */}
                   {categorySlug ? (
                     <Link
-                      href={`/${categorySlug}`}
+                      href={getPostCategoryUrl(post, categories)}
                       className="text-pink-600 font-bold uppercase tracking-wider text-xs block mb-1 hover:underline"
                       id={`hero-slide-cat-${post.id}`}
                     >

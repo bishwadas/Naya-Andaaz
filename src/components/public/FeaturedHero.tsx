@@ -2,11 +2,13 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { Post } from '@/types';
+import { Category, Post } from '@/types';
+import { getPostCategoryUrl } from '@/lib/categories';
 import { HeroSlider } from '@/components/public/HeroSlider';
 
 interface FeaturedHeroProps {
   posts: Post[];
+  categories: Category[];
 }
 
 /**
@@ -14,7 +16,7 @@ interface FeaturedHeroProps {
  * The caller only controls the post collection; layout and responsive behavior
  * stay identical on the home page and parent category pages.
  */
-export default function FeaturedHero({ posts }: FeaturedHeroProps) {
+export default function FeaturedHero({ posts, categories }: FeaturedHeroProps) {
   const sliderPosts = posts.slice(0, 6);
   const supportingPosts = posts.slice(6, 10).length > 0
     ? posts.slice(6, 10)
@@ -24,7 +26,7 @@ export default function FeaturedHero({ posts }: FeaturedHeroProps) {
     <section className="pt-2 sm:pt-4 pb-6 sm:pb-8 border-b border-gray-200" id="hero-section">
       <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-6 lg:gap-7 items-start">
         <div className="min-w-0">
-          <HeroSlider posts={sliderPosts} />
+          <HeroSlider posts={sliderPosts} categories={categories} />
 
           <div className="flex flex-col gap-4 mt-6 lg:hidden" id="mobile-hero-supporting-posts">
             {supportingPosts.map((post) => {
@@ -43,7 +45,7 @@ export default function FeaturedHero({ posts }: FeaturedHeroProps) {
                   </Link>
                   <div className="flex-1 min-w-0">
                     {catSlug ? (
-                      <Link href={`/${catSlug}`} className="text-pink-600 text-[11px] sm:text-xs font-bold uppercase tracking-wider block mb-0.5 hover:underline">{catName}</Link>
+                      <Link href={getPostCategoryUrl(post, categories)} className="text-pink-600 text-[11px] sm:text-xs font-bold uppercase tracking-wider block mb-0.5 hover:underline">{catName}</Link>
                     ) : (
                       <span className="text-pink-600 text-[11px] sm:text-xs font-bold uppercase tracking-wider block mb-0.5">{catName}</span>
                     )}
@@ -77,7 +79,7 @@ export default function FeaturedHero({ posts }: FeaturedHeroProps) {
                 </Link>
                 <div className="mt-2 flex-1 flex flex-col">
                   {catSlug ? (
-                    <Link href={`/${catSlug}`} className="text-pink-600 text-xs font-bold uppercase tracking-wider block mb-0.5 hover:underline">{catName}</Link>
+                    <Link href={getPostCategoryUrl(post, categories)} className="text-pink-600 text-xs font-bold uppercase tracking-wider block mb-0.5 hover:underline">{catName}</Link>
                   ) : (
                     <span className="text-pink-600 text-xs font-bold uppercase tracking-wider block mb-0.5">{catName}</span>
                   )}

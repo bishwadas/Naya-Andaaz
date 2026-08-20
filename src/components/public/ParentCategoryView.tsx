@@ -7,6 +7,7 @@ import { Category, MenuItem, Post, SiteSettings } from '@/types';
 import { Navbar } from '@/components/public/Navbar';
 import { Footer } from '@/components/public/Footer';
 import { filterPostsForCategoryTree } from '@/lib/categories';
+import { getPostCategoryUrl, getCategoryUrl } from '@/lib/categories';
 import FeaturedHero from '@/components/public/FeaturedHero';
 
 interface ParentCategoryViewProps {
@@ -49,7 +50,7 @@ export default function ParentCategoryView({
         </div>
 
         {/* Shared front-page hero, filtered to this category tree. */}
-        <FeaturedHero posts={categoryPosts} />
+        <FeaturedHero posts={categoryPosts} categories={categories} />
 
         {/* Child Category Sections */}
         {childCategories.map((child) => {
@@ -77,7 +78,7 @@ export default function ParentCategoryView({
                   <div className="w-24 h-1 mt-1 bg-pink-600 rounded-full"></div>
                 </div>
                 <Link
-                  href={`/${child.slug}`}
+                  href={getCategoryUrl(child, categories)}
                   className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-stone-900 hover:text-pink-600 group transition"
                 >
                   <span>See More</span>
@@ -106,7 +107,7 @@ export default function ParentCategoryView({
                         </Link>
                         {cat && (
                           <Link
-                            href={`/${cat.slug}`}
+                            href={getPostCategoryUrl(post, categories)}
                             className="text-[11px] font-bold uppercase tracking-wider text-pink-600 hover:text-pink-700 mb-1 transition"
                           >
                             {cat.name}
@@ -134,7 +135,7 @@ export default function ParentCategoryView({
                     </Link>
                     {centerPostSubCat(centerPost) && (
                       <Link
-                        href={`/${centerPostSubCat(centerPost)?.slug}`}
+                        href={getPostCategoryUrl(centerPost, categories)}
                         className="text-xs font-bold uppercase tracking-wider text-pink-600 hover:text-pink-700 mb-1.5 transition"
                       >
                         {centerPostSubCat(centerPost)?.name}
@@ -163,7 +164,7 @@ export default function ParentCategoryView({
                         </Link>
                         {cat && (
                           <Link
-                            href={`/${cat.slug}`}
+                            href={getPostCategoryUrl(post, categories)}
                             className="text-[11px] font-bold uppercase tracking-wider text-pink-600 hover:text-pink-700 mb-1 transition"
                           >
                             {cat.name}
@@ -196,7 +197,7 @@ export default function ParentCategoryView({
                       <div className="flex-1 min-w-0">
                         {cat && (
                           <Link
-                            href={`/${cat.slug}`}
+                            href={getPostCategoryUrl(post, categories)}
                             className="inline-block text-[11px] font-bold uppercase tracking-wider text-pink-600 hover:text-pink-700 mb-1 transition"
                           >
                             {cat.name}

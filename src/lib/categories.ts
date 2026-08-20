@@ -1,5 +1,18 @@
 import { Category, Post } from '@/types';
 
+/** Build the canonical public URL for a category or subcategory. */
+export function getCategoryUrl(category: Pick<Category, 'slug' | 'parentId'>, categories: Category[]): string {
+  const parent = category.parentId ? categories.find((candidate) => candidate.id === category.parentId) : undefined;
+  return parent ? `/${parent.slug}/${category.slug}` : `/${category.slug}`;
+}
+
+/** Build a canonical archive URL for a post's displayed category. */
+export function getPostCategoryUrl(post: Post, categories: Category[]): string {
+  const category = post.subCategory || post.category;
+  const knownCategory = categories.find((candidate) => candidate.id === category.id);
+  return getCategoryUrl(knownCategory || category, categories);
+}
+
 /**
  * Recursively collect all descendant category IDs for a given category ID.
  * Supports unlimited category nesting depth (Parent -> Child -> Grandchild -> Great Grandchild, etc.).

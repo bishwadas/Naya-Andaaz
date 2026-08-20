@@ -6,6 +6,7 @@ import { Home, ChevronRight, Loader2 } from 'lucide-react';
 import { Category, MenuItem, Post, SiteSettings } from '@/types';
 import { Navbar } from '@/components/public/Navbar';
 import { Footer } from '@/components/public/Footer';
+import { getPostCategoryUrl } from '@/lib/categories';
 
 interface SubCategoryArchiveViewProps {
   currentCategory: Category;
@@ -181,7 +182,7 @@ export default function SubCategoryArchiveView({
                         {/* Category Label - Pink Accent Text */}
                         {postCat && (
                           <Link
-                            href={`/${postCat.slug}`}
+                            href={getPostCategoryUrl(post, categories)}
                             className="text-[#db2777] hover:underline decoration-[#db2777] font-medium text-xs sm:text-[13px] tracking-wide inline-block mb-1 text-left uppercase"
                           >
                             {postCat.name}

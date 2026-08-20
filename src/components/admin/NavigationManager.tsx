@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Category, Menu, MenuItem } from '@/types';
 import { parseApiResponse } from '@/lib/api';
+import { getCategoryUrl } from '@/lib/categories';
 
 interface NavigationManagerProps {
   categories: Category[];
@@ -62,7 +63,7 @@ export const NavigationManager: React.FC<NavigationManagerProps> = ({ categories
         body: JSON.stringify({
           location: selectedLocation,
           label: cat.name,
-          url: `/${cat.slug}`,
+          url: getCategoryUrl(cat, categories),
           categorySlug: cat.slug,
           order: 99,
         }),
