@@ -249,32 +249,6 @@ export function ArticleView({
               </div>
             )}
 
-            {/* Author Profile Bio Card */}
-            {post.author && (
-              <div className="mt-8 p-5 bg-stone-100 rounded-2xl border border-stone-200 flex items-start gap-4">
-                {post.author.avatar ? (
-                  <img
-                    src={post.author.avatar}
-                    alt={post.author.name}
-                    className="w-14 h-14 rounded-full object-cover border border-stone-300 flex-shrink-0"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-full bg-pink-100 text-pink-700 font-bold flex items-center justify-center text-lg flex-shrink-0">
-                    {post.author.name?.charAt(0) || 'A'}
-                  </div>
-                )}
-                <div>
-                  <h3 className="font-bold text-stone-900 text-sm">
-                    Written by {post.author.name}
-                  </h3>
-                  <p className="text-xs sm:text-sm text-stone-600 mt-1 leading-relaxed">
-                    {post.author.bio ||
-                      'Editorial contributor covering fashion, wellness, culture, and lifestyle narratives.'}
-                  </p>
-                </div>
-              </div>
-            )}
-
             {/* Interactive Comment Section */}
             {post.allowComments !== false && (
               <div className="mt-10 pt-8 border-t border-stone-200">
