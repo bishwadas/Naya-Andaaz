@@ -1,0 +1,1 @@
+# Sereia Django Project
