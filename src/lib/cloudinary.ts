@@ -189,3 +189,43 @@ export function getOptimizedCloudinaryUrl(url: string, transformations?: string)
 
   return url;
 }
+
+/**
+ * Extracts the Cloudinary public_id from a full URL or returns the identifier as-is.
+ */
+export function extractCloudinaryPublicId(urlOrId: string): string | null {
+  if (!urlOrId) return null;
+  if (!urlOrId.includes('res.cloudinary.com')) {
+    return urlOrId.replace(/\.[^/.]+$/, '');
+  }
+  try {
+    const match = urlOrId.match(/\/upload\/(?:[a-zA-Z0-9_,:]+\/)?(?:v\d+\/)?(.+?)(?:\.[a-zA-Z0-9]+)?$/);
+    if (match && match[1]) {
+      return match[1];
+    }
+  } catch {
+    // fallback
+  }
+  return null;
+}
+
+/**
+ * Deletes an asset from Cloudinary storage using its public_id or URL.
+ */
+export async function deleteFromCloudinary(
+  publicIdOrUrl: string
+): Promise<{ success: boolean; result?: string; error?: string }> {
+  if (!isCloudinaryConfigured()) {
+    return { success: false, error: 'Cloudinary is not configured' };
+  }
+  try {
+    const client = getCloudinaryClient();
+    const publicId = extractCloudinaryPublicId(publicIdOrUrl) || publicIdOrUrl;
+    const res = await client.uploader.destroy(publicId);
+    return { success: res.result === 'ok' || res.result === 'not found', result: res.result };
+  } catch (error: any) {
+    console.warn('Cloudinary delete warning:', error.message || error);
+    return { success: false, error: error.message || 'Delete failed' };
+  }
+}
+

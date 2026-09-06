@@ -71,18 +71,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // File Size Check
+    // File Size Check (10 MB max)
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json({ error: 'File size exceeds maximum limit of 10MB' }, { status: 400 });
     }
 
     const ext = path.extname(file.name).toLowerCase();
-    const mime = file.type.toLowerCase();
+    const mime = (file.type || 'image/jpeg').toLowerCase();
 
     // File Type & Format Check
     if ((ext && !ALLOWED_EXTENSIONS.includes(ext)) || (mime && !ALLOWED_MIME_TYPES.includes(mime))) {
       return NextResponse.json(
-        { error: `Unsupported format or invalid file type (${file.type || ext}). Allowed formats: SVG, PNG, JPG, WebP, GIF, AVIF, ICO.` },
+        { error: `Unsupported format or invalid file type (${file.type || ext}). Allowed formats: JPG, PNG, WebP, GIF, SVG.` },
         { status: 400 }
       );
     }
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
     const imageUrl = cloudinaryResult.optimizedUrl || cloudinaryResult.secureUrl;
     const mediaTitle = title.trim() || file.name.replace(/\.[^/.]+$/, '');
 
-    // Save URL and metadata in Database
+    // Save Cloudinary URL and metadata in PostgreSQL database
     let savedMediaItem = null;
     try {
       savedMediaItem = await createMediaItem({
@@ -147,7 +147,8 @@ export async function POST(req: NextRequest) {
       publicId: cloudinaryResult.publicId,
       fileName: cloudinaryResult.publicId,
       fileSize: cloudinaryResult.bytes || file.size,
-      mimeType: file.type,
+      mimeType: file.type || 'image/png',
+      provider: 'cloudinary',
       media: savedMediaItem,
     });
   } catch (error: any) {
@@ -155,4 +156,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Upload failed' }, { status: 500 });
   }
 }
+
+
 
