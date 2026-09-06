@@ -61,10 +61,10 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const [isOpenMobile, setIsOpenMobile] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const routeMeta = ROUTE_LABELS[currentRoute] || { title: 'Admin CMS', category: 'Sereia' };
+  const routeMeta = ROUTE_LABELS[currentRoute] || { title: 'Admin CMS', category: 'Naya Andaaz' };
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex font-sans antialiased">
+    <div className="min-h-screen bg-white text-stone-900 flex font-sans antialiased">
       {/* Sidebar Navigation */}
       <AdminSidebar
         currentRoute={currentRoute}
@@ -86,7 +86,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         {/* Top Header App Bar */}
         <header
           id="admin-top-header"
-          className="h-16 px-4 md:px-6 bg-stone-950/80 backdrop-blur-md border-b border-stone-800/80 sticky top-0 z-30 flex items-center justify-between gap-4"
+          className="h-16 px-4 md:px-6 bg-white/95 backdrop-blur-md border-b border-stone-200 sticky top-0 z-30 flex items-center justify-between gap-4 shadow-xs"
         >
           <div className="flex items-center gap-3 min-w-0">
             {/* Mobile Drawer Hamburger Button */}
@@ -95,36 +95,38 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               type="button"
               aria-label="Open navigation menu"
               onClick={() => setIsOpenMobile(true)}
-              className="lg:hidden p-2 text-stone-400 hover:text-stone-100 hover:bg-stone-900 rounded-lg border border-stone-800 transition"
+              className="lg:hidden p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg border border-stone-200 transition"
             >
               <MenuIcon className="w-5 h-5" />
             </button>
 
-            {/* Breadcrumb Hierarchy */}
-            <div className="flex items-center gap-2 text-xs text-stone-400 min-w-0">
-              <span className="font-mono font-medium text-stone-400 hidden sm:inline">
-                Sereia CMS
-              </span>
-              {routeMeta.category && (
-                <>
-                  <ChevronRight className="w-3.5 h-3.5 text-stone-400 hidden sm:inline" />
-                  <span className="text-stone-400 hidden sm:inline">{routeMeta.category}</span>
-                </>
-              )}
-              <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
-              <h1 className="text-stone-100 font-semibold truncate text-sm">
-                {routeMeta.title}
-              </h1>
-            </div>
+            {/* Breadcrumb Hierarchy (hidden on dashboard) */}
+            {currentRoute !== 'dashboard' && (
+              <div className="flex items-center gap-2 text-xs text-stone-500 min-w-0">
+                <span className="font-mono font-medium text-stone-500 hidden sm:inline">
+                  Naya Andaaz
+                </span>
+                {routeMeta.category && (
+                  <>
+                    <ChevronRight className="w-3.5 h-3.5 text-stone-400 hidden sm:inline" />
+                    <span className="text-stone-500 hidden sm:inline">{routeMeta.category}</span>
+                  </>
+                )}
+                <ChevronRight className="w-3.5 h-3.5 text-stone-400" />
+                <h1 className="text-stone-900 font-bold truncate text-sm">
+                  {routeMeta.title}
+                </h1>
+              </div>
+            )}
           </div>
 
           {/* Right Header Actions */}
           <div className="flex items-center gap-2.5 shrink-0">
             {/* Live Role Badge */}
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-stone-900 border border-stone-800 rounded text-xs">
-              <ShieldCheck className="w-3.5 h-3.5 text-rose-400" />
-              <span className="text-stone-400 text-[11px]">Role:</span>
-              <span className="font-mono uppercase font-semibold text-rose-300 text-[11px]">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-stone-50 border border-stone-200 rounded text-xs">
+              <ShieldCheck className="w-3.5 h-3.5 text-pink-600" />
+              <span className="text-stone-500 text-[11px]">Role:</span>
+              <span className="font-mono uppercase font-bold text-pink-700 text-[11px]">
                 {currentUser?.role || 'ADMIN'}
               </span>
             </div>
@@ -134,12 +136,12 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
               id="admin-header-notifications-btn"
               type="button"
               onClick={() => onRouteChange('notifications')}
-              className="relative p-2 text-stone-400 hover:text-stone-100 hover:bg-stone-900 rounded-lg border border-stone-800/80 transition"
+              className="relative p-2 text-stone-600 hover:text-stone-900 hover:bg-stone-100 rounded-lg border border-stone-200 transition"
               title="Notifications"
             >
               <Bell className="w-4 h-4" />
               {Boolean(badgeCounts?.unreadNotifications && badgeCounts.unreadNotifications > 0) && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-rose-500 ring-2 ring-stone-950" />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-pink-600 ring-2 ring-white" />
               )}
             </button>
 
@@ -149,7 +151,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
                 id="admin-header-view-website-btn"
                 type="button"
                 onClick={onViewFrontend}
-                className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-rose-600 hover:bg-rose-500 active:bg-rose-700 text-white rounded text-xs font-medium shadow-sm transition"
+                className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-pink-600 hover:bg-pink-500 active:bg-pink-700 text-white rounded text-xs font-semibold shadow-xs transition"
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>View Site</span>
@@ -159,7 +161,7 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
         </header>
 
         {/* Page Content Body */}
-        <main id="admin-main-content-scroll" className="flex-1 p-4 md:p-6 lg:p-8">
+        <main id="admin-main-content-scroll" className="flex-1 p-4 md:p-6 lg:p-8 bg-stone-50/60">
           {children}
         </main>
       </div>

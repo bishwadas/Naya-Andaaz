@@ -42,12 +42,23 @@ export async function DELETE(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
-    if (!id) {
-      return NextResponse.json({ error: 'Tag ID is required' }, { status: 400 });
+    if (id) {
+      const res = await deleteTag(id);
+      return NextResponse.json(res);
     }
 
-    const res = await deleteTag(id);
-    return NextResponse.json(res);
+    // Support bulk delete via request JSON body
+    const body = await req.json().catch(() => null);
+    if (body && Array.isArray(body.ids) && body.ids.length > 0) {
+      for (const tagId of body.ids) {
+        if (typeof tagId === 'string' && tagId.trim()) {
+          await deleteTag(tagId.trim());
+        }
+      }
+      return NextResponse.json({ success: true, count: body.ids.length });
+    }
+
+    return NextResponse.json({ error: 'Tag ID or IDs required' }, { status: 400 });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

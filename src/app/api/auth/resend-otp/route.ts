@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!purpose || (purpose !== 'signup' && purpose !== 'reset_password')) {
+    if (!purpose || (purpose !== 'signup' && purpose !== 'signin' && purpose !== 'reset_password')) {
       return NextResponse.json(
         { success: false, error: 'Invalid purpose parameter' },
         { status: 400 }
@@ -35,10 +35,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // For signup purpose, if no user exists, return an error
-    if (purpose === 'signup' && !user) {
+    // For signup/signin purpose, if no user exists, return an error
+    if ((purpose === 'signup' || purpose === 'signin') && !user) {
       return NextResponse.json(
-        { success: false, error: 'No unverified account found for this email address. Please sign up first.' },
+        { success: false, error: 'No account found for this email address. Please sign up first.' },
         { status: 404 }
       );
     }
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     if (!emailResult.success) {
       return NextResponse.json(
-        { success: false, error: emailResult.error || 'Failed to dispatch email. Resend service issue.' },
+        { success: false, error: emailResult.error || 'Failed to dispatch verification code. Please try again.' },
         { status: 500 }
       );
     }
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
       });
     }
   } catch (error: any) {
-    console.error('Resend OTP error:', error);
+    console.error('OTP delivery error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to process request.' },
       { status: 500 }

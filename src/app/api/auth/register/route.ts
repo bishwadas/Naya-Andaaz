@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, createUser } from '@/db/repository';
-import { hashPassword } from '@/lib/auth';
+import { hashPassword, createSessionToken, setSessionCookie, sanitizeUser } from '@/lib/auth';
 import { createOtpForEmail } from '@/lib/otp';
 import { sendOtpEmail } from '@/lib/email';
 import { isEmailVerificationEnabled } from '@/lib/auth-config';
@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
           await db.delete(users).where(eq(users.id, existingUser.id));
         } catch (cleanupErr: any) {
           console.warn(`Could not clean up unverified user ${existingUser.id}:`, cleanupErr);
-          // If we can't delete due to references, let's notify the caller
           return NextResponse.json(
             { success: false, error: `Unverified user cleanup failure: ${cleanupErr.message || cleanupErr}` },
             { status: 500 }
@@ -117,8 +116,9 @@ export async function POST(req: NextRequest) {
     const baseUsername = cleanEmail.split('@')[0].replace(/[^a-zA-Z0-9._]/g, '');
     const username = `${baseUsername || 'user'}_${Math.floor(1000 + Math.random() * 9000)}`;
 
-    // 8. Create the user. In development mode, skip the email step by marking
-    // the account verified immediately; verification columns remain intact.
+    // 8. Create the user.
+    // When verification is disabled: mark emailVerified = true immediately.
+    // When verification is enabled: mark emailVerified = false until OTP confirmed.
     let newUser;
     try {
       newUser = await createUser({
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      // 10. Send verification email via the existing Resend integration.
+      // 10. Send verification email via Brevo.
       const emailResult = await sendOtpEmail({
         to: cleanEmail,
         name: name.trim(),
@@ -158,21 +158,41 @@ export async function POST(req: NextRequest) {
 
       if (!emailResult.success) {
         return NextResponse.json(
-          { success: false, error: `Resend API failure: ${emailResult.error || 'Failed to send verification email.'}` },
+          { success: false, error: emailResult.error || 'Failed to send verification email. Please try again.' },
           { status: 500 }
         );
       }
+
+      return NextResponse.json(
+        {
+          success: true,
+          message: 'OTP sent successfully. Please check your inbox for the 6-digit code.',
+          userId: newUser.id,
+          email: cleanEmail,
+          requiresVerification: true,
+        },
+        { status: 201 }
+      );
     }
+
+    // When verification is bypassed/disabled:
+    // Create authenticated session and set HTTP-only cookie immediately
+    const token = await createSessionToken({
+      id: newUser.id,
+      email: newUser.email,
+      role: newUser.role,
+      name: newUser.name,
+    });
+    await setSessionCookie(token);
 
     return NextResponse.json(
       {
         success: true,
-        message: emailVerificationEnabled
-          ? 'OTP sent successfully. Please check your inbox for the 6-digit code.'
-          : 'Account created successfully. You can sign in now.',
+        message: 'Account created and verified successfully.',
+        user: sanitizeUser(newUser),
         userId: newUser.id,
         email: cleanEmail,
-        requiresVerification: emailVerificationEnabled,
+        requiresVerification: false,
       },
       { status: 201 }
     );

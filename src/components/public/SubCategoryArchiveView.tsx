@@ -7,6 +7,8 @@ import { Category, MenuItem, Post, SiteSettings } from '@/types';
 import { Navbar } from '@/components/public/Navbar';
 import { Footer } from '@/components/public/Footer';
 import { getPostCategoryUrl } from '@/lib/categories';
+import { generateBreadcrumbJsonLd, generateCollectionJsonLd } from '@/lib/seo';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 interface SubCategoryArchiveViewProps {
   currentCategory: Category;
@@ -99,12 +101,52 @@ export default function SubCategoryArchiveView({
 
   const displayedPosts = categoryPosts.slice(0, displayCount);
 
+  const breadcrumbItems = [
+    { name: 'Home', url: '/' },
+    ...(parentCategory ? [{ name: parentCategory.name, url: `/${parentCategory.slug}` }] : []),
+    {
+      name: currentCategory.name,
+      url: parentCategory ? `/${parentCategory.slug}/${currentCategory.slug}` : `/${currentCategory.slug}`,
+    },
+  ];
+  const breadcrumbSchema = generateBreadcrumbJsonLd(breadcrumbItems, settings);
+
+  const subCategoryPath = parentCategory
+    ? `/${parentCategory.slug}/${currentCategory.slug}`
+    : `/${currentCategory.slug}`;
+  const siteName = settings?.siteName || 'Naya Andaaz';
+  const subCategoryTitle = currentCategory.seoTitle?.trim() || `${currentCategory.name} — ${parentCategory?.name || 'Category'}`;
+  const subCategoryDescription =
+    currentCategory.metaDescription?.trim() ||
+    currentCategory.description?.trim() ||
+    `Explore the latest stories, news, and updates in ${currentCategory.name} under ${parentCategory?.name || 'lifestyle'} on ${siteName}.`;
+
+  const collectionSchema = generateCollectionJsonLd(
+    subCategoryTitle,
+    subCategoryDescription,
+    subCategoryPath,
+    categoryPosts,
+    settings
+  );
+
   return (
     <div className="min-h-screen bg-white text-stone-900 font-sans antialiased flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(collectionSchema),
+        }}
+      />
       <Navbar categories={categories} settings={settings} primaryMenuItems={primaryMenuItems} />
 
       {/* Main Container - Generous spacing below Navbar */}
-      <main className="breadcrumb-page-main flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
+      <main className="breadcrumb-page-main flex-grow max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium mb-6">
           <Link href="/" className="hover:text-[#db2777] transition flex items-center gap-1">
@@ -160,22 +202,26 @@ export default function SubCategoryArchiveView({
                 <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10">
                   {displayedPosts.map((post) => {
                     const postCat = post.subCategory || post.category || currentCategory;
+                    const rawImage =
+                      post.featuredImage ||
+                      'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';
+                    const optimizedImg = getOptimizedImageUrl(rawImage, 600);
 
                     return (
                       <article key={post.id} className="group flex flex-col">
                         {/* Sharp Rectangular Image - No rounded corners, no card border, no shadow */}
                         <Link
-                          href={`/${post.slug}`}
+                          href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
                           className="block overflow-hidden bg-stone-100 aspect-[16/10] w-full mb-3"
                         >
                           <img
-                            src={
-                              post.featuredImage ||
-                              'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80'
-                            }
+                            src={optimizedImg}
                             alt={post.title}
+                            width={600}
+                            height={375}
                             className="w-full h-full object-cover rounded-none transition-transform duration-300 group-hover:scale-[1.02]"
                             loading="lazy"
+                            decoding="async"
                           />
                         </Link>
 
@@ -192,7 +238,7 @@ export default function SubCategoryArchiveView({
                         {/* Post Title - Strong Headline with Hover Underline */}
                         <h2 className="font-bold text-base sm:text-[17px] text-stone-950 leading-snug tracking-tight text-left">
                           <Link
-                            href={`/${post.slug}`}
+                            href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
                             className="hover:underline decoration-stone-900 underline-offset-2 transition-colors duration-150"
                           >
                             {post.title}

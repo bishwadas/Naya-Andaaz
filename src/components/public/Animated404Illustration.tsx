@@ -5,7 +5,9 @@ import React from 'react';
 export const Animated404Illustration: React.FC<{ className?: string }> = ({ className = '' }) => {
   return (
     <div className={`relative w-full max-w-[500px] aspect-[500/420] mx-auto select-none ${className}`}>
-      <style jsx>{`
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
         @keyframes floatCharacter {
           0%, 100% {
             transform: translateY(0px) rotate(0deg);
@@ -160,7 +162,9 @@ export const Animated404Illustration: React.FC<{ className?: string }> = ({ clas
             transform: none !important;
           }
         }
-      `}</style>
+      `,
+        }}
+      />
 
       <svg
         viewBox="0 0 480 420"

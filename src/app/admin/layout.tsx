@@ -1,24 +1,31 @@
-import { notFound } from 'next/navigation';
+import { redirect } from 'next/navigation';
 import { getCurrentUser } from '@/lib/auth';
+import { AdminLayoutClient } from '@/components/admin/AdminLayoutClient';
 
 export const dynamic = 'force-dynamic';
 
-export default async function AdminLayoutWrapper({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Server-Side Role Authorization:
-  // 1. Verify valid session
-  // 2. Fetch current user from database
-  // 3. Verify user has ADMIN role
   const user = await getCurrentUser();
 
-  if (!user || user.role?.toUpperCase() !== 'ADMIN') {
-    // If not logged in, guest, or any role other than ADMIN,
-    // trigger Next.js 404 Not Found directly on the current URL
-    notFound();
+  if (!user) {
+    redirect('/sign-in?callbackUrl=/admin');
   }
 
-  return <>{children}</>;
+  const role = (user.role || '').toUpperCase();
+  if (role !== 'ADMIN' && role !== 'SUPERADMIN') {
+    if (role === 'EDITOR') {
+      redirect('/editor');
+    }
+    if (role === 'AUTHOR') {
+      redirect('/author');
+    }
+    redirect('/account/profile');
+  }
+
+  return <AdminLayoutClient user={user}>{children}</AdminLayoutClient>;
 }
+

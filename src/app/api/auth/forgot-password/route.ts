@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail } from '@/db/repository';
 import { createOtpForEmail } from '@/lib/otp';
 import { sendOtpEmail } from '@/lib/email';
+import { isEmailVerificationEnabled } from '@/lib/auth-config';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,15 +34,20 @@ export async function POST(req: NextRequest) {
     const user = await getUserByEmail(cleanEmail);
 
     if (user && user.isActive) {
-      // Generate OTP and send via Resend
+      // Generate OTP
       const otpResult = await createOtpForEmail(cleanEmail, 'reset_password');
       if (otpResult.success && otpResult.otp) {
-        await sendOtpEmail({
-          to: cleanEmail,
-          name: user.name,
-          otp: otpResult.otp,
-          purpose: 'reset_password',
-        });
+        // Send via Brevo only when email verification is actively enabled
+        if (isEmailVerificationEnabled()) {
+          await sendOtpEmail({
+            to: cleanEmail,
+            name: user.name,
+            otp: otpResult.otp,
+            purpose: 'reset_password',
+          });
+        } else {
+          console.log(`[Forgot Password] Brevo delivery paused. Generated OTP for ${cleanEmail}: ${otpResult.otp}`);
+        }
       } else if (!otpResult.success) {
         // If cooldown applies or generate fails, we can handle it.
         // For rate limit cooldown, we can return the exact message to prevent flooding:

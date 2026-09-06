@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   FolderTree,
   Plus,
@@ -39,6 +40,7 @@ export const CategoriesManager: React.FC<CategoriesManagerProps> = ({
   categories,
   onCategoriesUpdated,
 }) => {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
@@ -244,12 +246,12 @@ export const CategoriesManager: React.FC<CategoriesManagerProps> = ({
       const payload = {
         name: formData.name.trim(),
         slug: formData.slug.trim().toLowerCase(),
-        description: formData.description.trim() || undefined,
+        description: formData.description.trim() ? formData.description.trim() : null,
         parentId: formData.parentId || null,
         color: formData.color || '#E11D48',
-        image: formData.image.trim() || undefined,
-        seoTitle: formData.seoTitle.trim() || undefined,
-        metaDescription: formData.metaDescription.trim() || undefined,
+        image: formData.image.trim() ? formData.image.trim() : null,
+        seoTitle: formData.seoTitle.trim() ? formData.seoTitle.trim() : null,
+        metaDescription: formData.metaDescription.trim() ? formData.metaDescription.trim() : null,
         order: Number(formData.order) || 0,
       };
 
@@ -273,6 +275,7 @@ export const CategoriesManager: React.FC<CategoriesManagerProps> = ({
 
       setIsModalOpen(false);
       onCategoriesUpdated();
+      router.refresh();
     } catch (err: any) {
       setFormError(err.message || 'An error occurred while saving.');
     } finally {
@@ -297,6 +300,7 @@ export const CategoriesManager: React.FC<CategoriesManagerProps> = ({
 
       setDeletingCategory(null);
       onCategoriesUpdated();
+      router.refresh();
     } catch (err: any) {
       setDeleteError(err.message || 'Failed to delete category.');
     } finally {

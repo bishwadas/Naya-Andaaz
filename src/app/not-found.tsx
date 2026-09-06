@@ -19,7 +19,7 @@ export default function NotFound() {
   return (
     <main
       role="main"
-      className="min-h-screen bg-white text-stone-900 flex flex-col items-center justify-center p-4 sm:p-6 md:p-12 overflow-x-hidden selection:bg-pink-100 selection:text-pink-900"
+      className="min-h-screen bg-white text-stone-900 flex flex-col items-center justify-center p-4 sm:p-6 md:p-12 overflow-x-hidden"
     >
       <div className="w-full max-w-5xl mx-auto flex flex-col lg:flex-row items-center justify-center gap-8 lg:gap-14 py-6 md:py-12">
         {/* LEFT COLUMN: Animated SVG Skydiving Illustration */}

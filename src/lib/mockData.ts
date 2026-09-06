@@ -23,7 +23,7 @@ export const INITIAL_POSTS: Post[] = [
 
 <blockquote>
   "Couture is not merely fashion; it is living sculpture that captures the emotional zeitgeist of our civilization."
-  <cite>— Elena Rostova, Sereia Editor-in-Chief</cite>
+  <cite>— Elena Rostova, Naya Andaaz Editorial Director</cite>
 </blockquote>
 
 <p>As collectors and cultural critics gather, one truth resonates clearly: true luxury is not about ubiquity, but about the timeless dedication to perfection that only human imagination can bestow.</p>
@@ -63,7 +63,7 @@ export const INITIAL_POSTS: Post[] = [
     publishedAt: '2026-08-12T10:00:00Z',
     updatedAt: '2026-08-12T10:00:00Z',
     createdAt: '2026-08-12T09:00:00Z',
-    seoTitle: 'Paris Haute Couture Week: Atelier Secrets & Trends | Sereia',
+    seoTitle: 'Paris Haute Couture Week: Atelier Secrets & Trends | Naya Andaaz',
     metaDescription: 'Explore the master craftsmanship, structural silhouettes, and timeless couture highlights from Paris Fashion Week.',
     focusKeyword: 'haute couture',
     faqs: [
@@ -238,7 +238,7 @@ export const INITIAL_POSTS: Post[] = [
     category: {
       id: 'cat_food',
       name: 'Food & Wine',
-      slug: 'food',
+      slug: 'food-wine',
       color: '#D97706',
     },
     tagIds: ['tag_8'],
@@ -385,19 +385,19 @@ export const INITIAL_POSTS: Post[] = [
 export const INITIAL_PAGES: Page[] = [
   {
     id: 'page_about',
-    title: 'About Sereia',
+    title: 'About Us',
     slug: 'about-us',
     content: `
-<h2>About Sereia Magazine</h2>
-<p>Sereia is an independent, award-winning international publication exploring the frontiers of modern culture, high fashion, cinematic arts, holistic wellness, and visionary lifestyle stories.</p>
-<p>Founded by editorial director Elena Rostova, Sereia stands at the intersection of deep journalism, elegant visual craft, and thoughtful perspectives for curious minds.</p>
+<h2>About Naya Andaaz</h2>
+<p>Naya Andaaz is an independent digital publication exploring the frontiers of modern lifestyle, entertainment, beauty, wellness, fashion, relationships, culture, and visionary living.</p>
+<p>Naya Andaaz stands at the intersection of engaging storytelling, authentic perspectives, and inspiring lifestyle journalism for contemporary readers.</p>
     `,
     featuredImage: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80',
     status: 'published',
     authorId: INITIAL_USERS[0].id,
     authorName: INITIAL_USERS[0].name,
-    seoTitle: 'About Sereia — Mission & Editorial Philosophy',
-    metaDescription: 'Learn about Sereia Magazine, our founders, editorial team, and dedication to cultural journalism.',
+    seoTitle: 'About Us — Mission & Editorial Philosophy | Naya Andaaz',
+    metaDescription: 'Learn about Naya Andaaz, our editorial team, and dedication to modern lifestyle and cultural storytelling.',
     publishedAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-08-01T00:00:00Z',
     createdAt: '2026-01-01T00:00:00Z',
@@ -407,16 +407,16 @@ export const INITIAL_PAGES: Page[] = [
     title: 'Contact Us',
     slug: 'contact-us',
     content: `
-<h2>Get in Touch with Sereia</h2>
-<p>We welcome editorial pitches, press releases, advertising collaborations, and general inquiries from our global community.</p>
-<p><strong>Editorial Desk:</strong> editorial@sereia.news<br /><strong>Advertising & Partnerships:</strong> partnerships@sereia.news<br /><strong>Press Office:</strong> press@sereia.news</p>
+<h2>Get in Touch with Naya Andaaz</h2>
+<p>We welcome editorial pitches, press releases, advertising collaborations, and general inquiries from our community.</p>
+<p><strong>Editorial Desk & Inquiries:</strong> hello@nayaandaaz.com<br /><strong>Advertising & Partnerships:</strong> hello@nayaandaaz.com<br /><strong>Press Office:</strong> hello@nayaandaaz.com</p>
     `,
     featuredImage: 'https://images.unsplash.com/photo-1486312338219-ce68d2c6f44d?auto=format&fit=crop&w=1200&q=80',
     status: 'published',
     authorId: INITIAL_USERS[0].id,
     authorName: INITIAL_USERS[0].name,
-    seoTitle: 'Contact Sereia — Editorial & Business Inquiries',
-    metaDescription: 'Reach the Sereia editorial newsroom, advertising directors, and press team.',
+    seoTitle: 'Contact Us — Editorial & Business Inquiries | Naya Andaaz',
+    metaDescription: 'Get in touch with Naya Andaaz editorial desk, advertising team, and press office. Reach us at hello@nayaandaaz.com.',
     publishedAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-08-01T00:00:00Z',
     createdAt: '2026-01-01T00:00:00Z',
@@ -427,12 +427,14 @@ export const INITIAL_PAGES: Page[] = [
     slug: 'privacy-policy',
     content: `
 <h2>Privacy Policy</h2>
-<p>At Sereia, accessible from https://sereia.news, one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by Sereia and how we use it.</p>
+<p>At Naya Andaaz, accessible from https://www.nayaandaaz.com, one of our main priorities is the privacy of our visitors. This Privacy Policy document contains types of information that is collected and recorded by Naya Andaaz and how we use it.</p>
 <p>We respect your privacy and never sell or monetize personal identification data.</p>
     `,
     status: 'published',
     authorId: INITIAL_USERS[0].id,
     authorName: INITIAL_USERS[0].name,
+    seoTitle: 'Privacy Policy | Naya Andaaz',
+    metaDescription: 'Privacy Policy and data protection guidelines for Naya Andaaz. Learn how we handle and protect your information.',
     publishedAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-08-01T00:00:00Z',
     createdAt: '2026-01-01T00:00:00Z',
@@ -442,12 +444,32 @@ export const INITIAL_PAGES: Page[] = [
     title: 'Terms & Conditions',
     slug: 'terms-and-conditions',
     content: `
-<h2>Terms and Conditions of Use</h2>
-<p>Welcome to Sereia. By accessing this website we assume you accept these terms and conditions. Do not continue to use Sereia if you do not agree to take all of the terms and conditions stated on this page.</p>
+<h2>1. Acceptance of Terms</h2>
+<p>Welcome to Naya Andaaz (accessible at www.nayaandaaz.com). These Terms &amp; Conditions govern your access to and use of our digital publication, features, and content. By accessing or using our platform, you accept and agree to be bound by these terms.</p>
+
+<h2>2. Permitted Use &amp; Acceptable Behavior</h2>
+<p>Naya Andaaz is provided for your personal, non-commercial reading and informational enjoyment. You agree not to engage in unauthorized data scraping, harvesting, or reverse-engineering of our editorial material. Automated crawling or extraction is strictly prohibited without prior written consent.</p>
+
+<h2>3. Content Disclaimers &amp; Advice Notice</h2>
+<p>Articles covering health, wellness, beauty, nutrition, finance, or lifestyle are created for informative and entertainment purposes only. They do not constitute certified medical, diagnostic, legal, or licensed financial advice. Readers should always consult certified professionals regarding specific health, fitness, or financial decisions.</p>
+
+<h2>4. Intellectual Property &amp; Copyright</h2>
+<p>All editorial articles, original photographs, graphics, layouts, and brand assets on Naya Andaaz are protected by copyright and intellectual property laws. You may not republish, syndicate, or redistribute content without express permission.</p>
+
+<h2>5. User Submissions &amp; Comments</h2>
+<p>Reader comments and editorial contributions must adhere to our community guidelines. Defamatory, abusive, or unlawful submissions will be removed.</p>
+
+<h2>6. Advertising &amp; Sponsored Content</h2>
+<p>Sponsored content and commercial partnerships are clearly identified to our audience. We maintain editorial independence from commercial sponsors.</p>
+
+<h2>7. Governing Law &amp; Contact</h2>
+<p>These terms are governed by the laws of India. For editorial inquiries or grievance redressal, contact our desk at hello@nayaandaaz.com.</p>
     `,
     status: 'published',
     authorId: INITIAL_USERS[0].id,
     authorName: INITIAL_USERS[0].name,
+    seoTitle: 'Terms & Conditions | Naya Andaaz',
+    metaDescription: 'Read the Terms & Conditions governing the use of Naya Andaaz, including editorial content, intellectual property, advertising, and website policies.',
     publishedAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-08-01T00:00:00Z',
     createdAt: '2026-01-01T00:00:00Z',

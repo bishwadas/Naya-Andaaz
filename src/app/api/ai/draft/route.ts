@@ -16,16 +16,16 @@ export async function POST(req: NextRequest) {
         slug: `${(topic || 'contemporary-design').toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now()}`,
         excerpt: `An insightful inquiry into the aesthetic, cultural, and philosophical shifts surrounding ${topic || 'modern arts'}.`,
         content: `<h2>The Zenith of Contemporary Craft</h2><p>In an epoch characterized by rapid digital velocity, ${topic || 'haute curation'} commands a deliberate return to permanence, tactile mastery, and architectural clarity.</p><p>Dissecting the nuanced intersections of material honesty and vanguard vision reveals how modern practitioners are reshaping the cultural dialogue.</p>`,
-        metaTitle: `${topic || 'Editorial Focus'} | Sereia Gazette`,
-        metaDescription: `An authoritative analysis exploring ${topic || 'contemporary luxury and craftsmanship'} in the modern era.`,
+        metaTitle: `${topic || 'Editorial Focus'} | Naya Andaaz`,
+        metaDescription: `An authoritative analysis exploring ${topic || 'contemporary lifestyle, culture, and perspectives'} on Naya Andaaz.`,
         faq: [
-          { question: `What distinguishes modern ${topic || 'craft'}?`, answer: 'The union of heritage savoir-faire with progressive architectural precision.' },
+          { question: `What distinguishes modern ${topic || 'culture'}?`, answer: 'The union of authentic perspectives with modern digital storytelling.' },
         ],
       });
     }
 
     const ai = new GoogleGenAI({ apiKey });
-    const prompt = `You are the editor-in-chief of Sereia, a luxury haute publication covering fashion, horology, culture, and architecture.
+    const prompt = `You are the editor-in-chief of Naya Andaaz, a contemporary digital lifestyle publication covering fashion, entertainment, culture, and wellness.
 Write a comprehensive article draft about: "${topic}". Tone: ${tone}. Category: ${category}.
 Return ONLY a valid JSON object with keys:
 "title" (string),

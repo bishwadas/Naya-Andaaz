@@ -1,4 +1,4 @@
-import { and, desc, eq, ilike, inArray, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import { db } from './index';
 import {
   activityLogs,
@@ -21,6 +21,18 @@ import {
 } from './schema';
 import { Category, Post, Tag, User } from '@/types';
 import { getCategoryTreeIds } from '@/lib/categories';
+import {
+  DEFAULT_SITE_SETTINGS,
+  INITIAL_CATEGORIES,
+  INITIAL_TAGS,
+  INITIAL_USERS,
+} from '@/lib/constants';
+import {
+  INITIAL_ACTIVITY_LOGS,
+  INITIAL_MEDIA,
+  INITIAL_PAGES,
+  INITIAL_POSTS,
+} from '@/lib/mockData';
 
 // ----------------------------------------------------
 // VALIDATION HELPERS
@@ -110,7 +122,7 @@ export {
   filterPostsForCategoryTree,
 } from '@/lib/categories';
 
-export async function getPosts(params: {
+export interface GetPostsParams {
   status?: string;
   categoryId?: string;
   subCategoryId?: string;
@@ -124,126 +136,285 @@ export async function getPosts(params: {
   isEditorPick?: boolean;
   limit?: number;
   offset?: number;
-  sortBy?: 'publishedAt' | 'views' | 'likes' | 'createdAt';
+  page?: number;
+  sortBy?: 'publishedAt' | 'views' | 'likes' | 'createdAt' | 'updatedAt' | 'title' | 'status';
   sortOrder?: 'asc' | 'desc';
-} = {}) {
-  try {
-    const conditions = [eq(posts.isTrashed, false)];
+  dateFilter?: 'all' | 'today' | 'yesterday' | 'this_week' | 'this_month' | 'previous_month' | 'custom';
+  dateFrom?: string;
+  dateTo?: string;
+  includeTrashed?: boolean;
+}
 
-    if (params.status) {
+export interface PostCounts {
+  all: number;
+  published: number;
+  draft: number;
+  scheduled: number;
+  pending: number;
+  trash: number;
+}
+
+export interface PaginatedPostsResult {
+  posts: Post[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  counts: PostCounts;
+}
+
+async function buildPostQueryConditions(params: GetPostsParams) {
+  const conditions: any[] = [];
+
+  // Status & Trash handling
+  if (params.status === 'trash') {
+    conditions.push(eq(posts.isTrashed, true));
+  } else if (!params.includeTrashed) {
+    conditions.push(eq(posts.isTrashed, false));
+    if (params.status && params.status !== 'all') {
       conditions.push(eq(posts.status, params.status));
     }
-    if (params.categoryIds && params.categoryIds.length > 0) {
+  } else if (params.status && params.status !== 'all') {
+    conditions.push(eq(posts.status, params.status));
+  }
+
+  // Category handling
+  if (params.categoryIds && params.categoryIds.length > 0) {
+    conditions.push(
+      or(
+        inArray(posts.categoryId, params.categoryIds),
+        inArray(posts.subCategoryId, params.categoryIds)
+      )
+    );
+  } else if (params.categoryId) {
+    try {
+      const categoryTree = await db.query.categories.findMany({
+        where: eq(categories.isTrashed, false),
+        columns: { id: true, parentId: true },
+      });
+      const categoryIds = getCategoryTreeIds(params.categoryId, categoryTree);
       conditions.push(
         or(
-          inArray(posts.categoryId, params.categoryIds),
-          inArray(posts.subCategoryId, params.categoryIds)
+          inArray(posts.categoryId, categoryIds),
+          inArray(posts.subCategoryId, categoryIds)
+        )
+      );
+    } catch {
+      conditions.push(
+        or(
+          eq(posts.categoryId, params.categoryId),
+          eq(posts.subCategoryId, params.categoryId)
+        )
+      );
+    }
+  } else if (params.subCategoryId) {
+    conditions.push(eq(posts.subCategoryId, params.subCategoryId));
+  } else if (params.categorySlug) {
+    const rawTargetSlug = params.categorySlug.trim().toLowerCase();
+    const isFood = rawTargetSlug === 'food' || rawTargetSlug === 'food-wine';
+    const category = await db.query.categories.findFirst({
+      where: and(
+        isFood
+          ? or(eq(categories.slug, 'food'), eq(categories.slug, 'food-wine'), eq(categories.id, 'cat_food'))
+          : eq(categories.slug, rawTargetSlug),
+        eq(categories.isTrashed, false)
+      ),
+      columns: { id: true },
+    });
+
+    if (category) {
+      const categoryTree = await db.query.categories.findMany({
+        where: eq(categories.isTrashed, false),
+        columns: { id: true, parentId: true },
+      });
+      const categoryIds = getCategoryTreeIds(category.id, categoryTree);
+      conditions.push(
+        or(
+          inArray(posts.categoryId, categoryIds),
+          inArray(posts.subCategoryId, categoryIds)
         )
       );
     } else {
-      if (params.categorySlug) {
-        const category = await db.query.categories.findFirst({
-          where: and(eq(categories.slug, params.categorySlug.trim().toLowerCase()), eq(categories.isTrashed, false)),
-          columns: { id: true },
-        });
-
-        // A slug is an exact category selector. An unknown slug must not fall
-        // back to another category or return the unfiltered post list.
-        if (category) {
-          const categoryTree = await db.query.categories.findMany({
-            where: eq(categories.isTrashed, false),
-            columns: { id: true, parentId: true },
-          });
-          const categoryIds = getCategoryTreeIds(category.id, categoryTree);
-          conditions.push(
-            or(
-              inArray(posts.categoryId, categoryIds),
-              inArray(posts.subCategoryId, categoryIds)
-            )
-          );
-        } else {
-          conditions.push(sql`1 = 0`);
-        }
-      }
-      if (params.categoryId) {
-        conditions.push(eq(posts.categoryId, params.categoryId));
-      }
-      if (params.subCategoryId) {
-        conditions.push(eq(posts.subCategoryId, params.subCategoryId));
-      }
+      conditions.push(sql`1 = 0`);
     }
-    if (params.authorId) {
-      conditions.push(eq(posts.authorId, params.authorId));
-    }
-    if (params.isFeatured !== undefined) {
-      conditions.push(eq(posts.isFeatured, params.isFeatured));
-    }
-    if (params.isTrending !== undefined) {
-      conditions.push(eq(posts.isTrending, params.isTrending));
-    }
-    if (params.isEditorPick !== undefined) {
-      conditions.push(eq(posts.isEditorPick, params.isEditorPick));
-    }
-    if (params.search && params.search.trim()) {
-      const searchTerm = params.search.trim();
+  }
 
-      // Find matching category IDs
-      const matchingCats = await db
-        .select({ id: categories.id })
-        .from(categories)
-        .where(
-          or(
-            ilike(categories.name, `%${searchTerm}%`),
-            ilike(categories.slug, `%${searchTerm}%`)
-          )
-        );
-      const catIds = matchingCats.map((c) => c.id);
-
-      // Find matching tag IDs
-      const matchingTags = await db
-        .select({ id: tags.id })
-        .from(tags)
-        .where(
-          or(
-            ilike(tags.name, `%${searchTerm}%`),
-            ilike(tags.slug, `%${searchTerm}%`)
-          )
-        );
-      const tagIds = matchingTags.map((t) => t.id);
-
-      let matchingPostIdsFromTags: string[] = [];
-      if (tagIds.length > 0) {
-        const ptRows = await db
-          .select({ postId: postTags.postId })
-          .from(postTags)
-          .where(inArray(postTags.tagId, tagIds));
-        matchingPostIdsFromTags = ptRows.map((pt) => pt.postId);
+  // Tag handling
+  if (params.tagSlug) {
+    const cleanTagSlug = params.tagSlug.trim().toLowerCase().replace(/^#+/, '');
+    const cleanTagWithHyphen = cleanTagSlug.replace(/[\s_]+/g, '-');
+    const tag = await db.query.tags.findFirst({
+      where: and(
+        or(
+          eq(tags.slug, cleanTagSlug),
+          eq(tags.slug, cleanTagWithHyphen),
+          ilike(tags.slug, cleanTagSlug),
+          ilike(tags.name, cleanTagSlug)
+        ),
+        eq(tags.isTrashed, false)
+      ),
+      columns: { id: true },
+    });
+    if (tag) {
+      const ptRows = await db
+        .select({ postId: postTags.postId })
+        .from(postTags)
+        .where(eq(postTags.tagId, tag.id));
+      const postIds = ptRows.map((r) => r.postId);
+      if (postIds.length > 0) {
+        conditions.push(inArray(posts.id, postIds));
+      } else {
+        conditions.push(sql`1 = 0`);
       }
+    } else {
+      conditions.push(sql`1 = 0`);
+    }
+  }
 
-      const searchConditions = [
-        ilike(posts.title, `%${searchTerm}%`),
-        ilike(posts.excerpt, `%${searchTerm}%`),
-        ilike(posts.content, `%${searchTerm}%`),
-        ilike(posts.focusKeyword, `%${searchTerm}%`),
-        ilike(posts.seoTitle, `%${searchTerm}%`),
-        ilike(posts.metaDescription, `%${searchTerm}%`),
-      ];
+  if (params.authorId) {
+    conditions.push(eq(posts.authorId, params.authorId));
+  }
+  if (params.isFeatured !== undefined) {
+    conditions.push(eq(posts.isFeatured, params.isFeatured));
+  }
+  if (params.isTrending !== undefined) {
+    conditions.push(eq(posts.isTrending, params.isTrending));
+  }
+  if (params.isEditorPick !== undefined) {
+    conditions.push(eq(posts.isEditorPick, params.isEditorPick));
+  }
 
-      if (catIds.length > 0) {
-        searchConditions.push(
-          inArray(posts.categoryId, catIds),
-          inArray(posts.subCategoryId, catIds)
-        );
-      }
+  // Date filters
+  const now = new Date();
+  if (params.dateFilter === 'today') {
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+    conditions.push(gte(posts.createdAt, startOfToday));
+  } else if (params.dateFilter === 'yesterday') {
+    const startOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+    const endOfYesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59, 999);
+    conditions.push(and(gte(posts.createdAt, startOfYesterday), lte(posts.createdAt, endOfYesterday)));
+  } else if (params.dateFilter === 'this_week') {
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    conditions.push(gte(posts.createdAt, sevenDaysAgo));
+  } else if (params.dateFilter === 'this_month') {
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0);
+    conditions.push(gte(posts.createdAt, startOfMonth));
+  } else if (params.dateFilter === 'previous_month') {
+    const startOfPrevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0);
+    const endOfPrevMonth = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    conditions.push(and(gte(posts.createdAt, startOfPrevMonth), lte(posts.createdAt, endOfPrevMonth)));
+  } else if (params.dateFilter === 'custom' || params.dateFrom || params.dateTo) {
+    if (params.dateFrom) {
+      const fromDate = new Date(params.dateFrom);
+      fromDate.setHours(0, 0, 0, 0);
+      conditions.push(gte(posts.createdAt, fromDate));
+    }
+    if (params.dateTo) {
+      const toDate = new Date(params.dateTo);
+      toDate.setHours(23, 59, 59, 999);
+      conditions.push(lte(posts.createdAt, toDate));
+    }
+  }
 
-      if (matchingPostIdsFromTags.length > 0) {
-        searchConditions.push(inArray(posts.id, matchingPostIdsFromTags));
-      }
+  // Search filter
+  if (params.search && params.search.trim()) {
+    const searchTerm = params.search.trim();
 
-      conditions.push(or(...searchConditions));
+    // Find matching category IDs
+    const matchingCats = await db
+      .select({ id: categories.id })
+      .from(categories)
+      .where(
+        or(
+          ilike(categories.name, `%${searchTerm}%`),
+          ilike(categories.slug, `%${searchTerm}%`)
+        )
+      );
+    const catIds = matchingCats.map((c) => c.id);
+
+    // Find matching tag IDs
+    const matchingTags = await db
+      .select({ id: tags.id })
+      .from(tags)
+      .where(
+        or(
+          ilike(tags.name, `%${searchTerm}%`),
+          ilike(tags.slug, `%${searchTerm}%`)
+        )
+      );
+    const tagIds = matchingTags.map((t) => t.id);
+
+    let matchingPostIdsFromTags: string[] = [];
+    if (tagIds.length > 0) {
+      const ptRows = await db
+        .select({ postId: postTags.postId })
+        .from(postTags)
+        .where(inArray(postTags.tagId, tagIds));
+      matchingPostIdsFromTags = ptRows.map((pt) => pt.postId);
     }
 
-    const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
+    const searchConditions = [
+      ilike(posts.title, `%${searchTerm}%`),
+      ilike(posts.slug, `%${searchTerm}%`),
+      ilike(posts.excerpt, `%${searchTerm}%`),
+      ilike(posts.content, `%${searchTerm}%`),
+      ilike(posts.focusKeyword, `%${searchTerm}%`),
+      ilike(posts.seoTitle, `%${searchTerm}%`),
+      ilike(posts.metaDescription, `%${searchTerm}%`),
+    ];
+
+    if (catIds.length > 0) {
+      searchConditions.push(
+        inArray(posts.categoryId, catIds),
+        inArray(posts.subCategoryId, catIds)
+      );
+    }
+
+    if (matchingPostIdsFromTags.length > 0) {
+      searchConditions.push(inArray(posts.id, matchingPostIdsFromTags));
+    }
+
+    conditions.push(or(...searchConditions));
+  }
+
+  return conditions.length > 0 ? and(...conditions) : undefined;
+}
+
+export async function getPostCounts(): Promise<PostCounts> {
+  try {
+    const [allRes, pubRes, draftRes, schedRes, pendRes, trashRes] = await Promise.all([
+      db.select({ value: count() }).from(posts).where(eq(posts.isTrashed, false)),
+      db.select({ value: count() }).from(posts).where(and(eq(posts.status, 'published'), eq(posts.isTrashed, false))),
+      db.select({ value: count() }).from(posts).where(and(eq(posts.status, 'draft'), eq(posts.isTrashed, false))),
+      db.select({ value: count() }).from(posts).where(and(eq(posts.status, 'scheduled'), eq(posts.isTrashed, false))),
+      db.select({ value: count() }).from(posts).where(and(eq(posts.status, 'pending'), eq(posts.isTrashed, false))),
+      db.select({ value: count() }).from(posts).where(eq(posts.isTrashed, true)),
+    ]);
+
+    return {
+      all: Number(allRes[0]?.value || 0),
+      published: Number(pubRes[0]?.value || 0),
+      draft: Number(draftRes[0]?.value || 0),
+      scheduled: Number(schedRes[0]?.value || 0),
+      pending: Number(pendRes[0]?.value || 0),
+      trash: Number(trashRes[0]?.value || 0),
+    };
+  } catch (error) {
+    console.error('Failed to query post counts:', error);
+    return {
+      all: INITIAL_POSTS.length,
+      published: INITIAL_POSTS.filter((p) => p.status === 'published').length,
+      draft: INITIAL_POSTS.filter((p) => p.status === 'draft').length,
+      scheduled: INITIAL_POSTS.filter((p) => p.status === 'scheduled').length,
+      pending: INITIAL_POSTS.filter((p) => p.status === 'pending').length,
+      trash: 0,
+    };
+  }
+}
+
+export async function getPosts(params: GetPostsParams = {}): Promise<Post[]> {
+  try {
+    const whereClause = await buildPostQueryConditions(params);
 
     // Query posts with relations
     const rawPosts = await db.query.posts.findMany({
@@ -258,9 +429,26 @@ export async function getPosts(params: {
           },
         },
       },
-      orderBy: (p) => {
-        const orderCol = params.sortBy ? p[params.sortBy] : p.publishedAt;
-        return params.sortOrder === 'asc' ? orderCol : desc(orderCol);
+      orderBy: (p, { asc, desc }) => {
+        if (params.sortBy === 'createdAt') {
+          return params.sortOrder === 'asc' ? asc(p.createdAt) : desc(p.createdAt);
+        }
+        if (params.sortBy === 'updatedAt') {
+          return params.sortOrder === 'asc' ? asc(p.updatedAt) : desc(p.updatedAt);
+        }
+        if (params.sortBy === 'title') {
+          return params.sortOrder === 'asc' ? asc(p.title) : desc(p.title);
+        }
+        if (params.sortBy === 'views') {
+          return params.sortOrder === 'asc' ? asc(p.views) : desc(p.views);
+        }
+        if (params.sortBy === 'likes') {
+          return params.sortOrder === 'asc' ? asc(p.likes) : desc(p.likes);
+        }
+        if (params.sortBy === 'status') {
+          return params.sortOrder === 'asc' ? asc(p.status) : desc(p.status);
+        }
+        return params.sortOrder === 'asc' ? asc(p.publishedAt) : desc(p.publishedAt);
       },
       limit: params.limit || 50,
       offset: params.offset || 0,
@@ -328,8 +516,226 @@ export async function getPosts(params: {
       updatedAt: p.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.error('getPosts query failed:', error);
-    throw new Error('Database query for posts failed', { cause: error });
+    console.warn('getPosts query failed, falling back to INITIAL_POSTS:', error);
+    let filtered = [...INITIAL_POSTS];
+    if (params.status && params.status !== 'all') {
+      filtered = filtered.filter((p) => p.status === params.status);
+    }
+    if (params.categoryId) {
+      filtered = filtered.filter(
+        (p) => p.categoryId === params.categoryId || p.category?.id === params.categoryId
+      );
+    }
+    if (params.categorySlug) {
+      const slugLower = params.categorySlug.toLowerCase().trim();
+      const isFood = slugLower === 'food' || slugLower === 'food-wine';
+      filtered = filtered.filter((p) => {
+        const pCatSlug = p.category?.slug?.toLowerCase()?.trim();
+        const pSubCatSlug = p.subCategory?.slug?.toLowerCase()?.trim();
+        if (isFood) {
+          return (
+            pCatSlug === 'food' ||
+            pCatSlug === 'food-wine' ||
+            pSubCatSlug === 'food' ||
+            pSubCatSlug === 'food-wine' ||
+            p.categoryId === 'cat_food'
+          );
+        }
+        return pCatSlug === slugLower || pSubCatSlug === slugLower;
+      });
+    }
+    if (params.authorId) {
+      filtered = filtered.filter(
+        (p) => p.authorId === params.authorId || p.author?.id === params.authorId
+      );
+    }
+    if (params.isFeatured !== undefined) {
+      filtered = filtered.filter((p) => p.isFeatured === params.isFeatured);
+    }
+    if (params.isTrending !== undefined) {
+      filtered = filtered.filter((p) => p.isTrending === params.isTrending);
+    }
+    if (params.isEditorPick !== undefined) {
+      filtered = filtered.filter((p) => p.isEditorPick === params.isEditorPick);
+    }
+    if (params.search && params.search.trim()) {
+      const term = params.search.toLowerCase().trim();
+      filtered = filtered.filter(
+        (p) =>
+          p.title.toLowerCase().includes(term) ||
+          p.content.toLowerCase().includes(term) ||
+          (p.excerpt && p.excerpt.toLowerCase().includes(term))
+      );
+    }
+    if (params.limit) {
+      const offset = params.offset || 0;
+      filtered = filtered.slice(offset, offset + params.limit);
+    }
+    return filtered;
+  }
+}
+
+export async function getPostsPaginated(params: GetPostsParams = {}): Promise<PaginatedPostsResult> {
+  try {
+    const limit = Math.max(1, Math.min(params.limit || 20, 100));
+    const page = Math.max(1, params.page || 1);
+    const offset = params.offset !== undefined ? params.offset : (page - 1) * limit;
+
+    const whereClause = await buildPostQueryConditions(params);
+
+    const [totalRows, counts] = await Promise.all([
+      db.select({ value: count() }).from(posts).where(whereClause),
+      getPostCounts(),
+    ]);
+
+    const total = Number(totalRows[0]?.value || 0);
+
+    const postList = await getPosts({
+      ...params,
+      limit,
+      offset,
+    });
+
+    return {
+      posts: postList,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+      counts,
+    };
+  } catch (error) {
+    console.error('getPostsPaginated failed:', error);
+    const counts = await getPostCounts();
+    return {
+      posts: INITIAL_POSTS.slice(0, 20),
+      total: INITIAL_POSTS.length,
+      page: 1,
+      limit: 20,
+      totalPages: Math.ceil(INITIAL_POSTS.length / 20),
+      counts,
+    };
+  }
+}
+
+export async function duplicatePost(id: string, authorId?: string): Promise<Post | null> {
+  const original = await getPostById(id);
+  if (!original) return null;
+
+  const randomSuffix = Math.floor(1000 + Math.random() * 9000);
+  const newSlug = `${original.slug}-copy-${randomSuffix}`;
+  const newTitle = `${original.title} (Copy)`;
+
+  const newPostData = {
+    title: newTitle,
+    slug: newSlug,
+    content: original.content,
+    excerpt: original.excerpt,
+    featuredImage: original.featuredImage,
+    featuredImageCaption: original.featuredImageCaption,
+    authorId: authorId || original.authorId,
+    categoryId: original.categoryId,
+    subCategoryId: original.subCategoryId,
+    status: 'draft',
+    isFeatured: false,
+    isTrending: false,
+    isEditorPick: false,
+    seoTitle: original.seoTitle,
+    metaDescription: original.metaDescription,
+    focusKeyword: original.focusKeyword,
+    canonicalUrl: original.canonicalUrl,
+    ogImage: original.ogImage,
+    blocks: original.blocks,
+    faqs: original.faqs,
+    relatedPostIds: original.relatedPostIds,
+    allowComments: original.allowComments,
+    tagNames: original.tags?.map((t) => t.name) || [],
+  };
+
+  return await createPost(newPostData);
+}
+
+export async function bulkUpdatePosts(params: {
+  action: 'trash' | 'restore' | 'delete' | 'publish' | 'draft' | 'pending' | 'scheduled' | 'category';
+  postIds: string[];
+  categoryId?: string;
+  scheduledAt?: string;
+}): Promise<{ count: number; success: boolean }> {
+  const { action, postIds, categoryId, scheduledAt } = params;
+  if (!postIds || postIds.length === 0) return { count: 0, success: true };
+
+  try {
+    if (action === 'trash') {
+      await db
+        .update(posts)
+        .set({ isTrashed: true, trashedAt: new Date(), updatedAt: new Date() })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'restore') {
+      await db
+        .update(posts)
+        .set({ isTrashed: false, trashedAt: null, updatedAt: new Date() })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'delete') {
+      for (const id of postIds) {
+        await permanentDeletePost(id);
+      }
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'publish') {
+      await db
+        .update(posts)
+        .set({ status: 'published', publishedAt: new Date(), updatedAt: new Date() })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'draft') {
+      await db
+        .update(posts)
+        .set({ status: 'draft', updatedAt: new Date() })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'pending') {
+      await db
+        .update(posts)
+        .set({ status: 'pending', updatedAt: new Date() })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'scheduled') {
+      await db
+        .update(posts)
+        .set({
+          status: 'scheduled',
+          scheduledAt: scheduledAt ? new Date(scheduledAt) : new Date(Date.now() + 86400000),
+          updatedAt: new Date(),
+        })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    if (action === 'category' && categoryId) {
+      await db
+        .update(posts)
+        .set({ categoryId, subCategoryId: null, updatedAt: new Date() })
+        .where(inArray(posts.id, postIds));
+      return { count: postIds.length, success: true };
+    }
+
+    return { count: 0, success: false };
+  } catch (error) {
+    console.error('bulkUpdatePosts error:', error);
+    throw error;
   }
 }
 
@@ -412,8 +818,11 @@ export async function getPostBySlug(slugOrId: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.error('getPostBySlug failed:', error);
-    throw new Error('Database query for post failed', { cause: error });
+    console.warn('getPostBySlug failed, falling back to INITIAL_POSTS:', error);
+    const matched = INITIAL_POSTS.find(
+      (p) => p.slug === slugOrId || p.id === slugOrId
+    );
+    return matched || null;
   }
 }
 
@@ -453,7 +862,7 @@ export async function createPost(data: any) {
       id: 'usr_admin_01',
       name: 'Elena Rostova',
       username: 'elena.rostova',
-      email: 'admin@sereia.news',
+      email: 'hello@nayaandaaz.com',
       role: 'admin' as const,
       avatar: resolvedAuthorAvatar,
     };
@@ -588,7 +997,7 @@ export async function createPost(data: any) {
         updatedAt: new Date(),
       });
 
-      // 2. Link Tags (support tagIds, tagNames array, or comma-separated string)
+      // 2. Link Tags (support tagIds, tagNames array, tags array of strings/objects, or comma-separated string)
       const tagsToLink: string[] = [];
       if (Array.isArray(data.tagIds)) {
         tagsToLink.push(...data.tagIds);
@@ -596,40 +1005,68 @@ export async function createPost(data: any) {
       if (Array.isArray(data.tagNames)) {
         tagsToLink.push(...data.tagNames);
       }
+      if (Array.isArray(data.tags)) {
+        for (const t of data.tags) {
+          if (typeof t === 'string') {
+            tagsToLink.push(t);
+          } else if (t && typeof t === 'object') {
+            if (t.name) tagsToLink.push(t.name);
+            else if (t.slug) tagsToLink.push(t.slug);
+            else if (t.id) tagsToLink.push(t.id);
+          }
+        }
+      }
       if (typeof data.tags === 'string') {
         tagsToLink.push(...data.tags.split(',').map((t: string) => t.trim()));
       }
 
       if (tagsToLink.length > 0) {
-        const uniqueTagStrings = Array.from(new Set(tagsToLink.filter(Boolean)));
+        const uniqueTagStrings = Array.from(
+          new Set(
+            tagsToLink
+              .map((t) => (typeof t === 'string' ? t.trim().replace(/^#+/, '').trim() : ''))
+              .filter((t) => t.length > 0)
+          )
+        );
         const allDbTags = await tx.select().from(tags);
 
-        for (const tagStr of uniqueTagStrings) {
-          const cleanTag = tagStr.trim();
-          if (!cleanTag) continue;
+        for (const cleanTag of uniqueTagStrings) {
+          const tagSlug =
+            cleanTag
+              .toLowerCase()
+              .replace(/[^a-z0-9-_]+/g, '-')
+              .replace(/(^-|-$)+/g, '') || `tag-${Date.now()}`;
 
           let matchedTag = allDbTags.find(
             (t) =>
               t.id === cleanTag ||
               t.name.toLowerCase() === cleanTag.toLowerCase() ||
-              t.slug.toLowerCase() === cleanTag.toLowerCase()
+              t.slug.toLowerCase() === cleanTag.toLowerCase() ||
+              t.slug.toLowerCase() === tagSlug
           );
 
           if (!matchedTag) {
-            const tagSlug = cleanTag.toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/(^-|-$)+/g, '') || `tag-${Date.now()}`;
             const tagId = `tag_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-            const [createdTag] = await tx
-              .insert(tags)
-              .values({
-                id: tagId,
-                name: cleanTag,
-                slug: tagSlug,
-                createdAt: new Date(),
-              })
-              .onConflictDoNothing()
-              .returning();
+            try {
+              const [createdTag] = await tx
+                .insert(tags)
+                .values({
+                  id: tagId,
+                  name: cleanTag,
+                  slug: tagSlug,
+                  createdAt: new Date(),
+                })
+                .onConflictDoNothing()
+                .returning();
 
-            matchedTag = createdTag || (await tx.query.tags.findFirst({ where: eq(tags.slug, tagSlug) }));
+              matchedTag = createdTag || (await tx.query.tags.findFirst({ where: eq(tags.slug, tagSlug) })) || undefined;
+            } catch (err) {
+              matchedTag = (await tx.query.tags.findFirst({ where: eq(tags.slug, tagSlug) })) || undefined;
+            }
+
+            if (matchedTag) {
+              allDbTags.push(matchedTag);
+            }
           }
 
           if (matchedTag) {
@@ -790,50 +1227,87 @@ export async function updatePost(id: string, data: any) {
       const tagsToLink: string[] = [];
       if (Array.isArray(data.tagIds)) tagsToLink.push(...data.tagIds);
       if (Array.isArray(data.tagNames)) tagsToLink.push(...data.tagNames);
+      if (Array.isArray(data.tags)) {
+        for (const t of data.tags) {
+          if (typeof t === 'string') {
+            tagsToLink.push(t);
+          } else if (t && typeof t === 'object') {
+            if (t.name) tagsToLink.push(t.name);
+            else if (t.slug) tagsToLink.push(t.slug);
+            else if (t.id) tagsToLink.push(t.id);
+          }
+        }
+      }
       if (typeof data.tags === 'string') tagsToLink.push(...data.tags.split(',').map((t: string) => t.trim()));
 
-      if (tagsToLink.length > 0) {
+      const tagsProvided =
+        Array.isArray(data.tagIds) ||
+        Array.isArray(data.tagNames) ||
+        Array.isArray(data.tags) ||
+        typeof data.tags === 'string';
+
+      if (tagsProvided) {
         await tx.delete(postTags).where(eq(postTags.postId, id));
-        const uniqueTagStrings = Array.from(new Set(tagsToLink.filter(Boolean)));
-        const allDbTags = await tx.select().from(tags);
 
-        for (const tagStr of uniqueTagStrings) {
-          const cleanTag = tagStr.trim();
-          if (!cleanTag) continue;
-
-          let matchedTag = allDbTags.find(
-            (t) =>
-              t.id === cleanTag ||
-              t.name.toLowerCase() === cleanTag.toLowerCase() ||
-              t.slug.toLowerCase() === cleanTag.toLowerCase()
+        if (tagsToLink.length > 0) {
+          const uniqueTagStrings = Array.from(
+            new Set(
+              tagsToLink
+                .map((t) => (typeof t === 'string' ? t.trim().replace(/^#+/, '').trim() : ''))
+                .filter((t) => t.length > 0)
+            )
           );
+          const allDbTags = await tx.select().from(tags);
 
-          if (!matchedTag) {
-            const tagSlug = cleanTag.toLowerCase().replace(/[^a-z0-9-_]+/g, '-').replace(/(^-|-$)+/g, '') || `tag-${Date.now()}`;
-            const tagId = `tag_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-            const [createdTag] = await tx
-              .insert(tags)
-              .values({
-                id: tagId,
-                name: cleanTag,
-                slug: tagSlug,
-                createdAt: new Date(),
-              })
-              .onConflictDoNothing()
-              .returning();
+          for (const cleanTag of uniqueTagStrings) {
+            const tagSlug =
+              cleanTag
+                .toLowerCase()
+                .replace(/[^a-z0-9-_]+/g, '-')
+                .replace(/(^-|-$)+/g, '') || `tag-${Date.now()}`;
 
-            matchedTag = createdTag || (await tx.query.tags.findFirst({ where: eq(tags.slug, tagSlug) }));
-          }
+            let matchedTag = allDbTags.find(
+              (t) =>
+                t.id === cleanTag ||
+                t.name.toLowerCase() === cleanTag.toLowerCase() ||
+                t.slug.toLowerCase() === cleanTag.toLowerCase() ||
+                t.slug.toLowerCase() === tagSlug
+            );
 
-          if (matchedTag) {
-            await tx
-              .insert(postTags)
-              .values({
-                id: `${id}_${matchedTag.id}`,
-                postId: id,
-                tagId: matchedTag.id,
-              })
-              .onConflictDoNothing();
+            if (!matchedTag) {
+              const tagId = `tag_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+              try {
+                const [createdTag] = await tx
+                  .insert(tags)
+                  .values({
+                    id: tagId,
+                    name: cleanTag,
+                    slug: tagSlug,
+                    createdAt: new Date(),
+                  })
+                  .onConflictDoNothing()
+                  .returning();
+
+                matchedTag = createdTag || (await tx.query.tags.findFirst({ where: eq(tags.slug, tagSlug) })) || undefined;
+              } catch (err) {
+                matchedTag = (await tx.query.tags.findFirst({ where: eq(tags.slug, tagSlug) })) || undefined;
+              }
+
+              if (matchedTag) {
+                allDbTags.push(matchedTag);
+              }
+            }
+
+            if (matchedTag) {
+              await tx
+                .insert(postTags)
+                .values({
+                  id: `${id}_${matchedTag.id}`,
+                  postId: id,
+                  tagId: matchedTag.id,
+                })
+                .onConflictDoNothing();
+            }
           }
         }
       }
@@ -915,24 +1389,33 @@ export async function getCategories() {
       },
     });
 
-    return rawCategories.map((c) => ({
-      id: c.id,
-      name: c.name,
-      slug: c.slug,
-      description: c.description || undefined,
-      parentId: c.parentId || null,
-      parentName: c.parent?.name || undefined,
-      color: c.color || '#E11D48',
-      image: c.image || undefined,
-      seoTitle: c.seoTitle || undefined,
-      metaDescription: c.metaDescription || undefined,
-      order: c.order ?? 0,
-      postCount: c.posts?.length || 0,
-      createdAt: c.createdAt.toISOString(),
-    }));
+    return rawCategories.map((c) => {
+      const isFoodWine =
+        c.id === 'cat_food' ||
+        c.slug.trim().toLowerCase() === 'food' ||
+        c.slug.trim().toLowerCase() === 'food-wine' ||
+        (c.name && c.name.toLowerCase().includes('food') && !c.parentId);
+      const canonicalSlug = isFoodWine ? 'food-wine' : c.slug;
+
+      return {
+        id: c.id,
+        name: c.name,
+        slug: canonicalSlug,
+        description: c.description || undefined,
+        parentId: c.parentId || null,
+        parentName: c.parent?.name || undefined,
+        color: c.color || '#E11D48',
+        image: c.image || undefined,
+        seoTitle: c.seoTitle || undefined,
+        metaDescription: c.metaDescription || undefined,
+        order: c.order ?? 0,
+        postCount: c.posts?.length || 0,
+        createdAt: c.createdAt.toISOString(),
+      };
+    });
   } catch (error) {
-    console.error('getCategories query failed:', error);
-    throw new Error('Database query for categories failed', { cause: error });
+    console.warn('getCategories query failed, falling back to INITIAL_CATEGORIES:', error);
+    return INITIAL_CATEGORIES;
   }
 }
 
@@ -1205,12 +1688,20 @@ export async function updateCategory(id: string, data: any) {
 
   if (data.name !== undefined) updateFields.name = data.name.trim();
   if (data.slug !== undefined) updateFields.slug = data.slug.trim().toLowerCase();
-  if (data.description !== undefined) updateFields.description = data.description || null;
+  if (data.description !== undefined) {
+    updateFields.description = data.description && String(data.description).trim() ? String(data.description).trim() : null;
+  }
   updateFields.parentId = resolvedParentId;
   if (data.color !== undefined) updateFields.color = data.color || '#E11D48';
-  if (data.image !== undefined) updateFields.image = data.image || null;
-  if (data.seoTitle !== undefined) updateFields.seoTitle = data.seoTitle || null;
-  if (data.metaDescription !== undefined) updateFields.metaDescription = data.metaDescription || null;
+  if (data.image !== undefined) {
+    updateFields.image = data.image && String(data.image).trim() ? String(data.image).trim() : null;
+  }
+  if (data.seoTitle !== undefined) {
+    updateFields.seoTitle = data.seoTitle && String(data.seoTitle).trim() ? String(data.seoTitle).trim() : null;
+  }
+  if (data.metaDescription !== undefined) {
+    updateFields.metaDescription = data.metaDescription && String(data.metaDescription).trim() ? String(data.metaDescription).trim() : null;
+  }
   if (data.order !== undefined) updateFields.order = Number(data.order) || 0;
 
   try {
@@ -1242,8 +1733,13 @@ export async function getTags() {
   try {
     const rawTags = await db.query.tags.findMany({
       where: eq(tags.isTrashed, false),
+      orderBy: [desc(tags.createdAt)],
       with: {
-        postTags: true,
+        postTags: {
+          with: {
+            post: true,
+          },
+        },
       },
     });
 
@@ -1252,12 +1748,14 @@ export async function getTags() {
       name: t.name,
       slug: t.slug,
       description: t.description || undefined,
-      postCount: t.postTags.length,
+      postCount: Array.isArray(t.postTags)
+        ? t.postTags.filter((pt) => pt.post && !pt.post.isTrashed).length
+        : 0,
       createdAt: t.createdAt.toISOString(),
     }));
   } catch (error) {
-    console.error('getTags failed:', error);
-    throw new Error('Database query for tags failed', { cause: error });
+    console.warn('getTags failed, falling back to INITIAL_TAGS:', error);
+    return INITIAL_TAGS;
   }
 }
 
@@ -1267,14 +1765,46 @@ export async function createTag(data: any) {
     throw new Error(`Validation failed: ${validation.errors.join(', ')}`);
   }
 
-  const tagId = data.id || `tag_${Date.now()}`;
+  const cleanName = data.name.trim().replace(/^#+/, '').trim();
+  const cleanSlug =
+    data.slug
+      .trim()
+      .toLowerCase()
+      .replace(/^#+/, '')
+      .replace(/[^a-z0-9-_]+/g, '-')
+      .replace(/(^-|-$)+/g, '') || `tag-${Date.now()}`;
+
+  // Check if tag with this slug already exists
+  const existing = await db.query.tags.findFirst({
+    where: eq(tags.slug, cleanSlug),
+  });
+
+  if (existing) {
+    if (existing.isTrashed) {
+      const [restored] = await db
+        .update(tags)
+        .set({
+          name: cleanName,
+          description: data.description !== undefined ? (data.description ? data.description.trim() : null) : existing.description,
+          isTrashed: false,
+          trashedAt: null,
+        })
+        .where(eq(tags.id, existing.id))
+        .returning();
+      return restored;
+    }
+    throw new Error(`A tag with slug "${cleanSlug}" already exists.`);
+  }
+
+  const tagId = data.id || `tag_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
   const [newTag] = await db
     .insert(tags)
     .values({
       id: tagId,
-      name: data.name.trim(),
-      slug: data.slug.trim().toLowerCase(),
-      description: data.description || null,
+      name: cleanName,
+      slug: cleanSlug,
+      description: data.description ? data.description.trim() : null,
+      isTrashed: false,
       createdAt: new Date(),
     })
     .returning();
@@ -1283,15 +1813,42 @@ export async function createTag(data: any) {
 }
 
 export async function updateTag(id: string, data: any) {
+  const cleanName = data.name !== undefined ? data.name.trim().replace(/^#+/, '').trim() : undefined;
+  const cleanSlug = data.slug !== undefined
+    ? data.slug
+        .trim()
+        .toLowerCase()
+        .replace(/^#+/, '')
+        .replace(/[^a-z0-9-_]+/g, '-')
+        .replace(/(^-|-$)+/g, '')
+    : undefined;
+
+  if (cleanName !== undefined && cleanName.length === 0) {
+    throw new Error('Tag name is required');
+  }
+
+  if (cleanSlug) {
+    const conflicting = await db.query.tags.findFirst({
+      where: and(eq(tags.slug, cleanSlug), ne(tags.id, id), eq(tags.isTrashed, false)),
+    });
+    if (conflicting) {
+      throw new Error(`A tag with slug "${cleanSlug}" already exists.`);
+    }
+  }
+
+  const updateFields: any = {};
+  if (cleanName !== undefined) updateFields.name = cleanName;
+  if (cleanSlug !== undefined) updateFields.slug = cleanSlug;
+  if (data.description !== undefined) {
+    updateFields.description = data.description ? data.description.trim() : null;
+  }
+
   const [updatedTag] = await db
     .update(tags)
-    .set({
-      name: data.name?.trim(),
-      slug: data.slug?.trim().toLowerCase(),
-      description: data.description !== undefined ? data.description : undefined,
-    })
+    .set(updateFields)
     .where(eq(tags.id, id))
     .returning();
+
   return updatedTag;
 }
 
@@ -1374,13 +1931,104 @@ export const deleteMediaItem = deleteMedia;
 // ----------------------------------------------------
 export async function getPages() {
   try {
-    const rawPages = await db.query.pages.findMany({
+    let rawPages = await db.query.pages.findMany({
       where: eq(pages.isTrashed, false),
       orderBy: (p) => desc(p.createdAt),
       with: {
         author: true,
       },
     });
+
+    if (rawPages.length === 0) {
+      // Resolve a valid author from the users table
+      const allUsers = await db.select().from(users);
+      let defaultAuthorId = allUsers[0]?.id;
+      let defaultAuthorName = allUsers[0]?.name || 'Editorial Staff';
+
+      if (!defaultAuthorId) {
+        const adminUser = {
+          id: 'usr_admin_01',
+          name: 'Elena Rostova',
+          username: 'elena.rostova',
+          email: 'hello@nayaandaaz.com',
+          role: 'admin' as const,
+        };
+        await db.insert(users).values(adminUser).onConflictDoNothing();
+        defaultAuthorId = 'usr_admin_01';
+        defaultAuthorName = 'Elena Rostova';
+      }
+
+      const defaultPages = [
+        {
+          id: 'page_privacy',
+          title: 'Privacy Policy',
+          slug: 'privacy-policy',
+          content: 'At Naya Andaaz, accessible from https://www.nayaandaaz.com, your privacy is one of our top priorities. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website.',
+          status: 'published',
+          authorId: defaultAuthorId,
+          authorName: defaultAuthorName,
+          seoTitle: 'Privacy Policy | Naya Andaaz',
+          metaDescription: 'Read the official Naya Andaaz Privacy Policy covering data protection, cookies, and user rights.',
+          publishedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'page_about',
+          title: 'About Us',
+          slug: 'about-us',
+          content: 'Naya Andaaz is an independent digital publication dedicated to modern culture, lifestyle, wellness, fashion, entertainment, and insightful perspectives.',
+          status: 'published',
+          authorId: defaultAuthorId,
+          authorName: defaultAuthorName,
+          seoTitle: 'About Us | Naya Andaaz',
+          metaDescription: 'Learn about Naya Andaaz, our mission, editorial vision, and story.',
+          publishedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'page_terms',
+          title: 'Terms of Service',
+          slug: 'terms-and-conditions',
+          content: 'By accessing and utilizing Naya Andaaz, you agree to comply with and be bound by the following terms and conditions of use.',
+          status: 'published',
+          authorId: defaultAuthorId,
+          authorName: defaultAuthorName,
+          seoTitle: 'Terms of Service | Naya Andaaz',
+          metaDescription: 'Official terms and conditions for readers and contributors of Naya Andaaz.',
+          publishedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+        {
+          id: 'page_contact',
+          title: 'Contact Us',
+          slug: 'contact-us',
+          content: 'Reach out to our editorial desk, advertising collaborations, and reader inquiry desk at hello@nayaandaaz.com.',
+          status: 'published',
+          authorId: defaultAuthorId,
+          authorName: defaultAuthorName,
+          seoTitle: 'Contact Us | Naya Andaaz',
+          metaDescription: 'Get in touch with Naya Andaaz editorial desk and press inquiries at hello@nayaandaaz.com.',
+          publishedAt: new Date(),
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ];
+
+      for (const p of defaultPages) {
+        await db.insert(pages).values(p).onConflictDoNothing();
+      }
+
+      rawPages = await db.query.pages.findMany({
+        where: eq(pages.isTrashed, false),
+        orderBy: (p) => desc(p.createdAt),
+        with: {
+          author: true,
+        },
+      });
+    }
 
     return rawPages.map((p) => ({
       id: p.id,
@@ -1398,8 +2046,8 @@ export async function getPages() {
       updatedAt: p.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.error('getPages failed:', error);
-    throw new Error('Database query for pages failed', { cause: error });
+    console.warn('getPages failed, falling back to INITIAL_PAGES:', error);
+    return INITIAL_PAGES;
   }
 }
 
@@ -1430,15 +2078,16 @@ export async function getPageById(id: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.error('getPageById failed:', error);
-    throw new Error('Database query for page failed', { cause: error });
+    console.warn('getPageById failed, falling back to INITIAL_PAGES:', error);
+    const matched = INITIAL_PAGES.find((page) => page.id === id);
+    return matched || null;
   }
 }
 
 export async function getPageBySlug(slug: string) {
   try {
     const p = await db.query.pages.findFirst({
-      where: and(eq(pages.slug, slug), eq(pages.isTrashed, false)),
+      where: and(eq(pages.slug, slug.toLowerCase().trim()), eq(pages.isTrashed, false)),
       with: {
         author: true,
       },
@@ -1462,31 +2111,88 @@ export async function getPageBySlug(slug: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.error('getPageBySlug failed:', error);
-    throw new Error('Database query for page failed', { cause: error });
+    console.warn('getPageBySlug failed, falling back to INITIAL_PAGES:', error);
+    const matched = INITIAL_PAGES.find(
+      (page) => page.slug.toLowerCase() === slug.toLowerCase().trim()
+    );
+    return matched || null;
   }
 }
 
 export async function createPage(data: any) {
-  if (!data.title || !data.slug || !data.authorId) {
-    throw new Error('Title, slug, and authorId are required for page');
+  if (!data.title || !data.slug) {
+    throw new Error('Title and slug are required for page');
   }
 
-  const pageId = data.id || `page_${Date.now()}`;
+  // 1. Resolve valid author from the users table
+  let resolvedAuthorId = data.authorId;
+  let resolvedAuthorName = data.authorName;
+
+  const allUsers = await db.select().from(users);
+  let matchedUser = allUsers.find(
+    (u) =>
+      u.id === data.authorId ||
+      (data.authorId && u.username?.toLowerCase() === String(data.authorId).toLowerCase()) ||
+      (data.authorId && u.email?.toLowerCase() === String(data.authorId).toLowerCase()) ||
+      (data.authorName && u.name?.toLowerCase() === String(data.authorName).toLowerCase())
+  );
+
+  if (!matchedUser && allUsers.length > 0) {
+    matchedUser = allUsers[0];
+  }
+
+  if (matchedUser) {
+    resolvedAuthorId = matchedUser.id;
+    resolvedAuthorName = matchedUser.name;
+  } else {
+    const defaultUser = {
+      id: 'usr_admin_01',
+      name: 'Elena Rostova',
+      username: 'elena.rostova',
+      email: 'hello@nayaandaaz.com',
+      role: 'admin' as const,
+    };
+    await db.insert(users).values(defaultUser).onConflictDoNothing();
+    resolvedAuthorId = 'usr_admin_01';
+    resolvedAuthorName = 'Elena Rostova';
+  }
+
+  // 2. Resolve Unique Slug
+  let cleanSlug = data.slug
+    .toString()
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9-_]+/g, '-')
+    .replace(/(^-|-$)+/g, '');
+  if (!cleanSlug) cleanSlug = `page-${Date.now()}`;
+
+  const existingSlugPage = await db.query.pages.findFirst({
+    where: and(eq(pages.slug, cleanSlug), eq(pages.isTrashed, false)),
+    columns: { id: true },
+  });
+  if (existingSlugPage && (!data.id || existingSlugPage.id !== data.id)) {
+    cleanSlug = `${cleanSlug}-${Math.random().toString(36).substring(2, 6)}`;
+  }
+
+  const pageId = data.id || `page_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  const validStatus = ['published', 'draft', 'trash'].includes(data.status) ? data.status : 'published';
+
   const [newPage] = await db
     .insert(pages)
     .values({
       id: pageId,
       title: data.title.trim(),
-      slug: data.slug.trim().toLowerCase(),
-      content: data.content || '',
-      featuredImage: data.featuredImage || null,
-      status: data.status || 'published',
-      authorId: data.authorId,
-      authorName: data.authorName || null,
-      seoTitle: data.seoTitle || null,
-      metaDescription: data.metaDescription || null,
-      publishedAt: new Date(),
+      slug: cleanSlug,
+      content: typeof data.content === 'string' ? data.content : '',
+      featuredImage: data.featuredImage?.trim() || null,
+      status: validStatus,
+      authorId: resolvedAuthorId,
+      authorName: resolvedAuthorName || 'Editorial Staff',
+      seoTitle: data.seoTitle?.trim() || (data.title ? `${data.title.trim()} — Naya Andaaz` : null),
+      metaDescription: data.metaDescription?.trim() || null,
+      isTrashed: false,
+      trashedAt: null,
+      publishedAt: validStatus === 'published' ? (data.publishedAt ? new Date(data.publishedAt) : new Date()) : null,
       createdAt: new Date(),
       updatedAt: new Date(),
     })
@@ -1496,18 +2202,41 @@ export async function createPage(data: any) {
 }
 
 export async function updatePage(id: string, data: any) {
+  const updateData: any = {
+    updatedAt: new Date(),
+  };
+
+  if (data.title !== undefined) updateData.title = data.title.trim();
+  if (data.slug !== undefined) {
+    updateData.slug = data.slug
+      .toString()
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9-_]+/g, '-')
+      .replace(/(^-|-$)+/g, '');
+  }
+  if (data.content !== undefined) updateData.content = data.content;
+  if (data.featuredImage !== undefined) updateData.featuredImage = data.featuredImage?.trim() || null;
+  if (data.status !== undefined) {
+    updateData.status = data.status;
+    if (data.status === 'published' && !data.publishedAt) {
+      updateData.publishedAt = new Date();
+    }
+  }
+  if (data.authorId !== undefined) {
+    const allUsers = await db.select().from(users);
+    const matchedUser = allUsers.find((u) => u.id === data.authorId);
+    if (matchedUser) {
+      updateData.authorId = matchedUser.id;
+      updateData.authorName = matchedUser.name;
+    }
+  }
+  if (data.seoTitle !== undefined) updateData.seoTitle = data.seoTitle?.trim() || null;
+  if (data.metaDescription !== undefined) updateData.metaDescription = data.metaDescription?.trim() || null;
+
   const [updatedPage] = await db
     .update(pages)
-    .set({
-      title: data.title,
-      slug: data.slug?.toLowerCase(),
-      content: data.content,
-      featuredImage: data.featuredImage,
-      status: data.status,
-      seoTitle: data.seoTitle,
-      metaDescription: data.metaDescription,
-      updatedAt: new Date(),
-    })
+    .set(updateData)
     .where(eq(pages.id, id))
     .returning();
 
@@ -1551,8 +2280,8 @@ export async function getUsers() {
       updatedAt: u.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.error('getUsers failed:', error);
-    throw new Error('Database query for users failed', { cause: error });
+    console.warn('getUsers failed, falling back to INITIAL_USERS:', error);
+    return INITIAL_USERS;
   }
 }
 
@@ -1562,12 +2291,14 @@ export async function getUserById(id: string) {
       where: and(eq(users.id, id), eq(users.isTrashed, false)),
     });
     if (!u) {
+      const fallbackUser = INITIAL_USERS.find((usr) => usr.id === id);
+      if (fallbackUser) return fallbackUser;
       if (id === 'usr_admin_01') {
         return {
           id: 'usr_admin_01',
           name: 'Elena Rostova',
           username: 'elena.rostova',
-          email: 'admin@sereia.news',
+          email: 'hello@nayaandaaz.com',
           role: 'admin' as any,
           avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
           isActive: true,
@@ -1602,12 +2333,15 @@ export async function getUserById(id: string) {
       updatedAt: u.updatedAt.toISOString(),
     };
   } catch (error) {
+    console.warn('getUserById failed, falling back to INITIAL_USERS:', error);
+    const fallbackUser = INITIAL_USERS.find((usr) => usr.id === id);
+    if (fallbackUser) return fallbackUser;
     if (id === 'usr_admin_01') {
       return {
         id: 'usr_admin_01',
         name: 'Elena Rostova',
         username: 'elena.rostova',
-        email: 'admin@sereia.news',
+        email: 'hello@nayaandaaz.com',
         role: 'admin' as any,
         avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
         isActive: true,
@@ -1616,8 +2350,7 @@ export async function getUserById(id: string) {
         updatedAt: new Date().toISOString(),
       };
     }
-    console.error('getUserById failed:', error);
-    throw new Error('Database query for user failed', { cause: error });
+    return null;
   }
 }
 
@@ -2005,7 +2738,7 @@ export async function deleteComment(id: string) {
 export async function getSettings() {
   try {
     const rows = await db.select().from(siteSettings);
-    const settingsObj: Record<string, any> = {};
+    const settingsObj: Record<string, any> = { ...DEFAULT_SITE_SETTINGS };
     for (const r of rows) {
       try {
         settingsObj[r.key] = JSON.parse(r.value);
@@ -2015,8 +2748,8 @@ export async function getSettings() {
     }
     return settingsObj;
   } catch (error) {
-    console.error('getSettings failed:', error);
-    throw new Error('Database query for settings failed', { cause: error });
+    console.warn('getSettings failed, falling back to DEFAULT_SITE_SETTINGS:', error);
+    return { ...DEFAULT_SITE_SETTINGS };
   }
 }
 
@@ -2047,8 +2780,84 @@ export const updateSiteSettings = updateSettings;
 // ----------------------------------------------------
 // MENUS REPOSITORY
 // ----------------------------------------------------
+export async function ensureDefaultMenus() {
+  try {
+    const defaultMenus = [
+      { id: 'menu_primary', name: 'Primary Navigation', location: 'primary' },
+      { id: 'menu_footer', name: 'Footer Links', location: 'footer' },
+      { id: 'menu_mobile', name: 'Mobile Navigation', location: 'mobile' },
+    ];
+    for (const menu of defaultMenus) {
+      await db
+        .insert(menus)
+        .values({
+          id: menu.id,
+          name: menu.name,
+          location: menu.location,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .onConflictDoNothing();
+    }
+  } catch (error) {
+    console.warn('ensureDefaultMenus notice:', error);
+  }
+}
+
+export async function resolveMenuId(menuIdOrLocation: string): Promise<string> {
+  const trimmed = (menuIdOrLocation || 'primary').trim();
+
+  // 1. Check if an existing menu has this exact ID
+  const menuById = await db.query.menus.findFirst({
+    where: eq(menus.id, trimmed),
+  });
+  if (menuById) return menuById.id;
+
+  // 2. Check if an existing menu has this location
+  const menuByLoc = await db.query.menus.findFirst({
+    where: eq(menus.location, trimmed),
+  });
+  if (menuByLoc) return menuByLoc.id;
+
+  // 3. If neither exists, insert a menu for this location/id and return its ID
+  const newId = trimmed.startsWith('menu_') ? trimmed : `menu_${trimmed}`;
+  const location = ['primary', 'footer', 'mobile'].includes(trimmed) ? trimmed : 'primary';
+  const name =
+    location === 'primary'
+      ? 'Primary Navigation'
+      : location === 'footer'
+      ? 'Footer Links'
+      : 'Mobile Navigation';
+
+  try {
+    const [created] = await db
+      .insert(menus)
+      .values({
+        id: newId,
+        name,
+        location,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: menus.location,
+        set: { updatedAt: new Date() },
+      })
+      .returning();
+    return created.id;
+  } catch {
+    // If conflict or already exists, refetch
+    const fallback = await db.query.menus.findFirst({
+      where: or(eq(menus.id, newId), eq(menus.location, location)),
+    });
+    return fallback ? fallback.id : 'menu_primary';
+  }
+}
+
 export async function getMenus() {
   try {
+    await ensureDefaultMenus();
+
     const rawMenus = await db.query.menus.findMany({
       with: {
         items: {
@@ -2061,7 +2870,7 @@ export async function getMenus() {
       id: m.id,
       name: m.name,
       location: m.location as any,
-      items: m.items.map((i) => ({
+      items: (m.items || []).map((i) => ({
         id: i.id,
         menuId: i.menuId,
         label: i.label,
@@ -2093,17 +2902,29 @@ export async function getPrimaryMenuItems() {
     });
 
     if (primaryMenu && primaryMenu.items && primaryMenu.items.length > 0) {
-      return primaryMenu.items.map((i) => ({
-        id: i.id,
-        menuId: i.menuId,
-        label: i.label,
-        url: i.url,
-        categorySlug: i.categorySlug || undefined,
-        parentId: i.parentId || null,
-        order: i.order,
-        target: i.target || '_self',
-        createdAt: i.createdAt.toISOString(),
-      }));
+      return primaryMenu.items.map((i) => {
+        const rawCatSlug = (i.categorySlug || '').toLowerCase().trim();
+        const isFood =
+          rawCatSlug === 'food' ||
+          rawCatSlug === 'food-wine' ||
+          i.url === '/food' ||
+          i.url === '/food-wine' ||
+          (i.label && i.label.toLowerCase().includes('food'));
+        const canonicalUrl = isFood ? '/food-wine' : i.url;
+        const canonicalCatSlug = isFood ? 'food-wine' : (i.categorySlug || undefined);
+
+        return {
+          id: i.id,
+          menuId: i.menuId,
+          label: i.label,
+          url: canonicalUrl,
+          categorySlug: canonicalCatSlug,
+          parentId: i.parentId || null,
+          order: i.order,
+          target: i.target || '_self',
+          createdAt: i.createdAt.toISOString(),
+        };
+      });
     }
 
     return [];
@@ -2113,19 +2934,169 @@ export async function getPrimaryMenuItems() {
   }
 }
 
-export async function updateMenuItems(menuId: string, items: any[]) {
+export async function createMenuItem(data: {
+  menuIdOrLocation: string;
+  label: string;
+  url: string;
+  categorySlug?: string | null;
+  parentId?: string | null;
+  order?: number;
+  target?: string;
+}) {
+  const resolvedMenuId = await resolveMenuId(data.menuIdOrLocation);
+
+  // Fetch current items for this menu to calculate order and check for duplicates
+  const existingItems = await db.query.menuItems.findMany({
+    where: eq(menuItems.menuId, resolvedMenuId),
+    orderBy: (i) => i.order,
+  });
+
+  const cleanLabel = (data.label || '').trim();
+  const cleanUrl = (data.url || '').trim();
+  const cleanCategorySlug = data.categorySlug ? data.categorySlug.trim().toLowerCase() : null;
+  const parentId = data.parentId ? data.parentId.trim() : null;
+
+  if (!cleanLabel) {
+    throw new Error('Menu item label is required.');
+  }
+  if (!cleanUrl) {
+    throw new Error('Menu item URL is required.');
+  }
+
+  // Duplicate prevention check:
+  // 1. If adding a category, check if this categorySlug already exists in this menu
+  if (cleanCategorySlug) {
+    const isDuplicateCat = existingItems.some(
+      (item) => item.categorySlug && item.categorySlug.toLowerCase() === cleanCategorySlug
+    );
+    if (isDuplicateCat) {
+      const err = new Error('This category is already added to the menu.');
+      (err as any).statusCode = 409;
+      throw err;
+    }
+  }
+
+  // 2. Check if identical URL + parent exists
+  const isDuplicateUrl = existingItems.some(
+    (item) =>
+      item.url.trim().toLowerCase() === cleanUrl.toLowerCase() &&
+      (item.parentId || null) === parentId &&
+      item.label.trim().toLowerCase() === cleanLabel.toLowerCase()
+  );
+  if (isDuplicateUrl) {
+    const err = new Error('This item is already added to the menu.');
+    (err as any).statusCode = 409;
+    throw err;
+  }
+
+  // Calculate order: next valid sequential order
+  let assignedOrder: number;
+  if (typeof data.order === 'number' && data.order !== 99 && !isNaN(data.order)) {
+    assignedOrder = data.order;
+  } else {
+    const maxOrder = existingItems.reduce((max, item) => Math.max(max, item.order ?? 0), -1);
+    assignedOrder = maxOrder + 1;
+  }
+
+  const itemId = crypto.randomUUID();
+  const [created] = await db
+    .insert(menuItems)
+    .values({
+      id: itemId,
+      menuId: resolvedMenuId,
+      label: cleanLabel,
+      url: cleanUrl,
+      categorySlug: cleanCategorySlug,
+      parentId,
+      order: assignedOrder,
+      target: data.target || '_self',
+      createdAt: new Date(),
+    })
+    .returning();
+
+  return {
+    id: created.id,
+    menuId: created.menuId,
+    label: created.label,
+    url: created.url,
+    categorySlug: created.categorySlug || undefined,
+    parentId: created.parentId || null,
+    order: created.order,
+    target: created.target || '_self',
+    createdAt: created.createdAt.toISOString(),
+  };
+}
+
+export async function updateMenuItem(
+  id: string,
+  data: {
+    label?: string;
+    url?: string;
+    categorySlug?: string | null;
+    parentId?: string | null;
+    order?: number;
+    target?: string;
+  }
+) {
+  const updateData: Record<string, any> = {};
+  if (data.label !== undefined) updateData.label = data.label.trim();
+  if (data.url !== undefined) updateData.url = data.url.trim();
+  if (data.categorySlug !== undefined) updateData.categorySlug = data.categorySlug ? data.categorySlug.trim() : null;
+  if (data.parentId !== undefined) updateData.parentId = data.parentId ? data.parentId.trim() : null;
+  if (data.order !== undefined) updateData.order = Number(data.order);
+  if (data.target !== undefined) updateData.target = data.target;
+
+  const [updated] = await db
+    .update(menuItems)
+    .set(updateData)
+    .where(eq(menuItems.id, id))
+    .returning();
+
+  if (!updated) {
+    throw new Error('Menu item not found');
+  }
+
+  return {
+    id: updated.id,
+    menuId: updated.menuId,
+    label: updated.label,
+    url: updated.url,
+    categorySlug: updated.categorySlug || undefined,
+    parentId: updated.parentId || null,
+    order: updated.order,
+    target: updated.target || '_self',
+    createdAt: updated.createdAt.toISOString(),
+  };
+}
+
+export async function deleteMenuItem(id: string) {
   return await db.transaction(async (tx) => {
-    await tx.delete(menuItems).where(eq(menuItems.menuId, menuId));
+    // Set children's parentId to null so they don't break hierarchy
+    await tx
+      .update(menuItems)
+      .set({ parentId: null })
+      .where(eq(menuItems.parentId, id));
+
+    // Delete the menu item
+    await tx.delete(menuItems).where(eq(menuItems.id, id));
+  });
+}
+
+export async function updateMenuItems(menuIdOrLocation: string, items: any[]) {
+  const resolvedMenuId = await resolveMenuId(menuIdOrLocation);
+
+  return await db.transaction(async (tx) => {
+    await tx.delete(menuItems).where(eq(menuItems.menuId, resolvedMenuId));
     for (let index = 0; index < items.length; index++) {
       const item = items[index];
       await tx.insert(menuItems).values({
-        id: item.id || `item_${Date.now()}_${index}`,
-        menuId,
+        id: item.id || crypto.randomUUID(),
+        menuId: resolvedMenuId,
         label: item.label,
         url: item.url,
         categorySlug: item.categorySlug || null,
         parentId: item.parentId || null,
-        order: index,
+        order: typeof item.order === 'number' ? item.order : index,
         target: item.target || '_self',
         createdAt: new Date(),
       });
@@ -2187,32 +3158,66 @@ export async function getNotifications() {
 // ----------------------------------------------------
 export async function getDashboardMetrics() {
   try {
-    const [allPosts, allCategories, allTags, allMedia, allPages, allUsers, allLogs] =
+    const [allPosts, allCategories, allTags, allMedia, allPages, allUsers, allComments, allLogs] =
       await Promise.all([
-        getPosts({ limit: 100 }),
+        getPosts({ limit: 500 }),
         getCategories(),
         getTags(),
         getMedia(),
         getPages(),
         getUsers(),
+        getComments(),
         getActivityLogs(10),
       ]);
 
     const totalViews = allPosts.reduce((acc, p) => acc + (p.views || 0), 0);
+    const publishedPosts = allPosts.filter((p) => p.status === 'published');
+    const draftPosts = allPosts.filter((p) => p.status === 'draft');
+    const pendingPosts = allPosts.filter((p) => p.status === 'pending');
+    const scheduledPosts = allPosts.filter((p) => p.status === 'scheduled');
+    const trashPosts = allPosts.filter((p) => p.status === 'trash' || p.isTrashed);
+
+    // Top performing articles by real views
+    const topPerformingPosts = [...publishedPosts]
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .slice(0, 5);
+
+    // Category distribution from real posts
+    const categoryCounts: Record<string, { id: string; name: string; count: number; color?: string }> = {};
+    for (const cat of allCategories) {
+      categoryCounts[cat.id] = { id: cat.id, name: cat.name, count: 0, color: cat.color || undefined };
+    }
+    for (const post of publishedPosts) {
+      if (post.category?.id && categoryCounts[post.category.id]) {
+        categoryCounts[post.category.id].count += 1;
+      }
+    }
+
+    const categoryDistribution = Object.values(categoryCounts)
+      .filter((c) => c.count > 0)
+      .sort((a, b) => b.count - a.count);
 
     return {
       totalPosts: allPosts.length,
-      publishedPosts: allPosts.filter((p) => p.status === 'published').length,
-      draftPosts: allPosts.filter((p) => p.status === 'draft').length,
-      pendingPosts: allPosts.filter((p) => p.status === 'pending').length,
-      trashPosts: allPosts.filter((p) => p.status === 'trash').length,
+      publishedPosts: publishedPosts.length,
+      draftPosts: draftPosts.length,
+      pendingPosts: pendingPosts.length,
+      scheduledPosts: scheduledPosts.length,
+      trashPosts: trashPosts.length,
       totalCategories: allCategories.length,
       totalTags: allTags.length,
       totalMedia: allMedia.length,
       totalPages: allPages.length,
       totalUsers: allUsers.length,
+      totalComments: allComments.length,
+      pendingComments: allComments.filter((c) => c.status === 'pending').length,
       totalViews,
-      recentPosts: allPosts.slice(0, 5),
+      topPerformingPosts,
+      categoryDistribution,
+      allPosts,
+      allCategories,
+      allComments,
+      recentPosts: allPosts.slice(0, 6),
       recentUsers: allUsers.slice(0, 5),
       recentActivity: allLogs,
     };
@@ -2223,13 +3228,21 @@ export async function getDashboardMetrics() {
       publishedPosts: 0,
       draftPosts: 0,
       pendingPosts: 0,
+      scheduledPosts: 0,
       trashPosts: 0,
       totalCategories: 0,
       totalTags: 0,
       totalMedia: 0,
       totalPages: 0,
       totalUsers: 0,
+      totalComments: 0,
+      pendingComments: 0,
       totalViews: 0,
+      topPerformingPosts: [],
+      categoryDistribution: [],
+      allPosts: [],
+      allCategories: [],
+      allComments: [],
       recentPosts: [],
       recentUsers: [],
       recentActivity: [],
@@ -2625,7 +3638,80 @@ export async function emptyTrash() {
 // ----------------------------------------------------
 // SEARCH ANALYTICS REPOSITORY
 // ----------------------------------------------------
+/**
+ * Validates search terms to ensure only clean, relevant search topics are displayed.
+ * Disallows raw URLs, image URLs, random text, filler words, or invalid symbols.
+ */
+export function isValidSearchTerm(rawTerm: any): boolean {
+  if (typeof rawTerm !== 'string') return false;
+  const term = rawTerm.trim();
+
+  // Length constraint: must be a legitimate search phrase (between 3 and 55 characters)
+  if (term.length < 3 || term.length > 55) return false;
+
+  // Reject URLs, protocols, web domains, and query strings
+  if (
+    /^https?:\/\//i.test(term) ||
+    /^(www\.)/i.test(term) ||
+    /\.(com|org|net|io|in|co|gov|edu|ai|app|xyz|site|online|me|info|biz)\b/i.test(term) ||
+    term.includes('://') ||
+    term.includes('cloudinary') ||
+    term.includes('/upload/') ||
+    term.includes('data:image') ||
+    term.includes('?_a=') ||
+    term.includes('?') ||
+    term.includes('&') ||
+    term.includes('=')
+  ) {
+    return false;
+  }
+
+  // Reject image or media file extensions
+  if (/\.(png|jpe?g|gif|webp|svg|avif|bmp|tiff|pdf|exe|zip|mp4|mp3|json|xml|html?)$/i.test(term)) {
+    return false;
+  }
+
+  // Reject raw code, HTML tags, scripts, JSON brackets, slashes
+  if (/[<>{}[\]\\\/^~`$@%*]/.test(term)) {
+    return false;
+  }
+
+  // Must contain letters (not pure numbers or pure punctuation)
+  if (!/[a-zA-Z]/.test(term)) {
+    return false;
+  }
+
+  // Reject keyboard mashing or excessive repeated characters (e.g. "aaaaa", "asdfgh")
+  if (/([a-zA-Z])\1{3,}/.test(term)) {
+    return false;
+  }
+
+  // Reject generic filler / test words with no search context
+  const bannedKeywords = new Set([
+    'hi', 'hello', 'hey', 'test', 'testing', 'asdf', 'qwerty', 'good', 'bad', 'ok', 'okay',
+    'yes', 'no', 'null', 'undefined', 'nan', 'true', 'false', 'admin', 'hire', 'sample', 'image', 'photo'
+  ]);
+  if (bannedKeywords.has(term.toLowerCase())) {
+    return false;
+  }
+
+  return true;
+}
+
 export async function getMostSearchedTerms(): Promise<string[]> {
+  const curatedFallbackTerms: [string, number][] = [
+    ['Friday OTT Releases', 1520],
+    ['XO Kitty Season 3 Twitter Review', 1480],
+    ['Crime 101', 1390],
+    ['Sitaare Zameen Par OTT Release', 1350],
+    ['OTT Releases This Week', 1290],
+    ['Punjabi Movie Download Website', 1210],
+    ['Hollywood Series Download', 1150],
+    ['Websites To Watch Bollywood Movies', 1080],
+    ['Websites To Download South Indian Movies', 990],
+    ['Websites To Download Tamil Dubbed Movies', 920],
+  ];
+
   try {
     const setting = await db.query.siteSettings.findFirst({
       where: eq(siteSettings.key, 'most_searched_analytics'),
@@ -2641,53 +3727,57 @@ export async function getMostSearchedTerms(): Promise<string[]> {
       }
     }
 
-    // Default seed terms if empty or less than 10 terms
-    const defaultTermsWithCounts: [string, number][] = [
-      ['Friday OTT Releases', 1520],
-      ['XO Kitty Season 3 Twitter Review', 1480],
-      ['Crime 101', 1390],
-      ['Sitaare Zameen Par OTT Release', 1350],
-      ['OTT Releases This Week', 1290],
-      ['Punjabi Movie Download Website', 1210],
-      ['Hollywood Series Download', 1150],
-      ['Websites To Watch Bollywood Movies', 1080],
-      ['Websites To Download South Indian Movies', 990],
-      ['Websites To Download Tamil Dubbed Movies', 920],
-    ];
+    let hadInvalidTerms = false;
+    const validTermsMap: Record<string, number> = {};
 
-    for (const [term, count] of defaultTermsWithCounts) {
-      if (!termsMap[term]) {
-        termsMap[term] = count;
+    // Filter and sanitize every search term from analytics
+    for (const [term, count] of Object.entries(termsMap)) {
+      if (isValidSearchTerm(term)) {
+        validTermsMap[term] = count;
+      } else {
+        hadInvalidTerms = true;
       }
     }
 
-    // Sort terms by search popularity/frequency descending
-    const sortedTerms = Object.entries(termsMap)
+    // Persist cleaned map to database if invalid items were purged
+    if (hadInvalidTerms && setting) {
+      try {
+        await db
+          .update(siteSettings)
+          .set({ value: JSON.stringify(validTermsMap), updatedAt: new Date() })
+          .where(eq(siteSettings.key, 'most_searched_analytics'));
+      } catch (e) {
+        // silent fallback
+      }
+    }
+
+    // Supplement with curated terms if fewer than 10
+    for (const [term, count] of curatedFallbackTerms) {
+      const alreadyHas = Object.keys(validTermsMap).some(
+        (k) => k.toLowerCase() === term.toLowerCase()
+      );
+      if (!alreadyHas) {
+        validTermsMap[term] = count;
+      }
+    }
+
+    // Sort terms by search popularity/frequency descending, strictly limit to 10
+    const sortedTerms = Object.entries(validTermsMap)
       .sort((a, b) => b[1] - a[1])
       .map(([term]) => term)
+      .filter((t) => isValidSearchTerm(t))
       .slice(0, 10);
 
     return sortedTerms;
   } catch (error) {
     console.error('Error in getMostSearchedTerms:', error);
-    return [
-      'Friday OTT Releases',
-      'XO Kitty Season 3 Twitter Review',
-      'Crime 101',
-      'Sitaare Zameen Par OTT Release',
-      'OTT Releases This Week',
-      'Punjabi Movie Download Website',
-      'Hollywood Series Download',
-      'Websites To Watch Bollywood Movies',
-      'Websites To Download South Indian Movies',
-      'Websites To Download Tamil Dubbed Movies',
-    ];
+    return curatedFallbackTerms.map(([t]) => t);
   }
 }
 
 export async function recordSearchQuery(query: string): Promise<void> {
-  const clean = query.trim();
-  if (!clean || clean.length < 2) return;
+  const clean = query.trim().replace(/\s+/g, ' ');
+  if (!isValidSearchTerm(clean)) return;
 
   try {
     const setting = await db.query.siteSettings.findFirst({
@@ -2711,10 +3801,18 @@ export async function recordSearchQuery(query: string): Promise<void> {
     if (existingKey) {
       termsMap[existingKey] += 1;
     } else {
-      termsMap[clean] = 100; // New query starting frequency
+      termsMap[clean] = 1;
     }
 
-    const payload = JSON.stringify(termsMap);
+    // Sanitize before saving
+    const cleanedMap: Record<string, number> = {};
+    for (const [k, v] of Object.entries(termsMap)) {
+      if (isValidSearchTerm(k)) {
+        cleanedMap[k] = v;
+      }
+    }
+
+    const payload = JSON.stringify(cleanedMap);
 
     if (setting) {
       await db
@@ -2732,4 +3830,126 @@ export async function recordSearchQuery(query: string): Promise<void> {
     console.error('Error recording search query:', error);
   }
 }
+
+// ----------------------------------------------------
+// AUTHOR & EDITOR DOMAIN HELPERS
+// ----------------------------------------------------
+export async function getAuthorBySlug(authorSlug: string): Promise<{
+  author: User;
+  posts: Post[];
+  totalPublished: number;
+} | null> {
+  try {
+    const cleanSlug = authorSlug.toLowerCase().trim();
+    const allUsers = await getUsers();
+    
+    // Find matching user by username, id, or normalized name slug
+    const matchedUser = allUsers.find((u) => {
+      const uId = (u.id || '').toLowerCase();
+      const uUsername = (u.username || '').toLowerCase();
+      const uUsernameHyphen = uUsername.replace(/[\._\s]+/g, '-');
+      const uNameSlug = (u.name || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+
+      return (
+        uId === cleanSlug ||
+        uUsername === cleanSlug ||
+        uUsernameHyphen === cleanSlug ||
+        uNameSlug === cleanSlug
+      );
+    });
+
+    if (!matchedUser) {
+      return null;
+    }
+
+    const authorPosts = await getPosts({
+      authorId: matchedUser.id,
+      status: 'published',
+      limit: 1000,
+    });
+
+    return {
+      author: matchedUser,
+      posts: authorPosts,
+      totalPublished: authorPosts.length,
+    };
+  } catch (error) {
+    console.error('getAuthorBySlug failed:', error);
+    return null;
+  }
+}
+
+export async function getAuthorStats(authorId: string) {
+  try {
+    const authorPosts = await getPosts({ authorId, limit: 500 });
+    const draftCount = authorPosts.filter((p) => p.status === 'draft').length;
+    const pendingCount = authorPosts.filter((p) => p.status === 'pending').length;
+    const publishedCount = authorPosts.filter((p) => p.status === 'published').length;
+    const totalViews = authorPosts.reduce((acc, p) => acc + (p.views || 0), 0);
+    const totalLikes = authorPosts.reduce((acc, p) => acc + (p.likes || 0), 0);
+
+    return {
+      totalPosts: authorPosts.length,
+      draftCount,
+      pendingCount,
+      publishedCount,
+      totalViews,
+      totalLikes,
+      recentPosts: authorPosts.slice(0, 10),
+    };
+  } catch (error) {
+    console.error('getAuthorStats failed:', error);
+    return {
+      totalPosts: 0,
+      draftCount: 0,
+      pendingCount: 0,
+      publishedCount: 0,
+      totalViews: 0,
+      totalLikes: 0,
+      recentPosts: [],
+    };
+  }
+}
+
+export async function getEditorStats() {
+  try {
+    const [allPostsList, allCategories, allTags] = await Promise.all([
+      getPosts({ limit: 1000 }),
+      getCategories(),
+      getTags(),
+    ]);
+
+    const publishedCount = allPostsList.filter((p) => p.status === 'published').length;
+    const pendingCount = allPostsList.filter((p) => p.status === 'pending').length;
+    const draftCount = allPostsList.filter((p) => p.status === 'draft').length;
+    const pendingReviewPosts = allPostsList.filter((p) => p.status === 'pending');
+
+    return {
+      totalPosts: allPostsList.length,
+      publishedCount,
+      pendingCount,
+      draftCount,
+      totalCategories: allCategories.length,
+      totalTags: allTags.length,
+      pendingReviewPosts: pendingReviewPosts.slice(0, 15),
+      recentPosts: allPostsList.slice(0, 10),
+    };
+  } catch (error) {
+    console.error('getEditorStats failed:', error);
+    return {
+      totalPosts: 0,
+      publishedCount: 0,
+      pendingCount: 0,
+      draftCount: 0,
+      totalCategories: 0,
+      totalTags: 0,
+      pendingReviewPosts: [],
+      recentPosts: [],
+    };
+  }
+}
+
 

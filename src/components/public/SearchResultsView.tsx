@@ -8,6 +8,7 @@ import { Category, MenuItem, Post, SiteSettings } from '@/types';
 import { Navbar } from '@/components/public/Navbar';
 import { Footer } from '@/components/public/Footer';
 import { getPostCategoryUrl } from '@/lib/categories';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 interface SearchResultsViewProps {
   query: string;
@@ -19,7 +20,7 @@ interface SearchResultsViewProps {
 
 const BATCH_SIZE = 12;
 const DEFAULT_FALLBACK_IMAGE =
-  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80';
+  'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';
 
 export default function SearchResultsView({
   query,
@@ -46,11 +47,18 @@ export default function SearchResultsView({
 
   // Record search analytics query on mount if present
   useEffect(() => {
-    if (query && query.trim().length > 1) {
+    const q = query ? query.trim() : '';
+    if (
+      q.length >= 3 &&
+      q.length <= 55 &&
+      !/^https?:\/\//i.test(q) &&
+      !q.includes('://') &&
+      !/\.(png|jpe?g|gif|webp|svg|pdf)$/i.test(q)
+    ) {
       fetch('/api/search/most-searched', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query.trim() }),
+        body: JSON.stringify({ query: q }),
       }).catch((err) => {
         console.error('Error recording search query:', err);
       });
@@ -131,7 +139,7 @@ export default function SearchResultsView({
       <Navbar categories={categories} settings={settings} primaryMenuItems={primaryMenuItems} />
 
       {/* Main Container */}
-      <main className="breadcrumb-page-main flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
+      <main className="breadcrumb-page-main flex-grow max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
         {/* Breadcrumb Navigation */}
         <nav className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium mb-6">
           <Link href="/" className="hover:text-[#db2777] transition flex items-center gap-1">
@@ -188,19 +196,24 @@ export default function SearchResultsView({
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-10">
               {posts.map((post) => {
                 const postCat = post.subCategory || post.category;
+                const rawImage = post.featuredImage || DEFAULT_FALLBACK_IMAGE;
+                const optimizedThumb = getOptimizedImageUrl(rawImage, 480);
 
                 return (
                   <article key={post.id} className="group flex flex-col">
                     {/* Rectangular Image - Sharp corners, no border, no shadow */}
                     <Link
-                      href={`/${post.slug}`}
+                      href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
                       className="block overflow-hidden bg-stone-100 aspect-[16/10] w-full mb-3"
                     >
                       <img
-                        src={post.featuredImage || DEFAULT_FALLBACK_IMAGE}
+                        src={optimizedThumb}
                         alt={post.title}
+                        width={480}
+                        height={300}
                         className="w-full h-full object-cover rounded-none transition-transform duration-300 group-hover:scale-[1.02]"
                         loading="lazy"
+                        decoding="async"
                         onError={(e) => {
                           (e.target as HTMLImageElement).src = DEFAULT_FALLBACK_IMAGE;
                         }}
@@ -220,7 +233,7 @@ export default function SearchResultsView({
                     {/* Post Title */}
                     <h2 className="font-bold text-base sm:text-[17px] text-stone-950 leading-snug tracking-tight text-left">
                       <Link
-                        href={`/${post.slug}`}
+                        href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
                         className="hover:underline decoration-stone-900 underline-offset-2 transition-colors duration-150"
                       >
                         {post.title}

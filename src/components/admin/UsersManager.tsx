@@ -146,20 +146,20 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
   return (
     <div className="space-y-6">
       {/* Action Header */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-stone-900 border border-stone-800 p-4 rounded-xl">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-[#FFFDFC] border border-[#E5E0DA] p-4 rounded-xl shadow-xs">
         <div className="flex items-center gap-2">
           <button
             onClick={() => setViewMode('all')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-              viewMode === 'all' ? 'bg-amber-400 text-stone-950 shadow-sm' : 'bg-stone-950 text-stone-400 hover:text-white'
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'all' ? 'bg-[#EC008C] text-white shadow-xs' : 'bg-[#F3F0EC] text-[#6B625C] hover:text-[#171717]'
             }`}
           >
             <UsersIcon className="w-3.5 h-3.5" /> All Users ({initialUsers.length})
           </button>
           <button
             onClick={startCreate}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-              viewMode === 'edit' && !editingUser ? 'bg-amber-400 text-stone-950 shadow-sm' : 'bg-stone-950 text-stone-400 hover:text-white'
+            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+              viewMode === 'edit' && !editingUser ? 'bg-[#EC008C] text-white shadow-xs' : 'bg-[#F3F0EC] text-[#6B625C] hover:text-[#171717]'
             }`}
           >
             <UserPlus className="w-3.5 h-3.5" /> Add New User
@@ -168,13 +168,13 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
 
         {viewMode === 'all' && (
           <div className="relative min-w-[220px]">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#8A817A]" />
             <input
               type="text"
               placeholder="Search users..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-stone-500 focus:outline-none focus:border-amber-400"
+              className="w-full bg-white border border-[#DDD6D0] rounded-lg pl-8 pr-3 py-1.5 text-xs text-[#171717] placeholder-[#8A817A] focus:outline-none focus:border-[#EC008C]"
             />
           </div>
         )}
@@ -182,30 +182,30 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
 
       {/* Messages */}
       {errorMsg && (
-        <div className="p-4 bg-rose-950/60 border border-rose-800 rounded-xl text-rose-200 text-xs flex items-center justify-between">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400" />
+            <AlertCircle className="w-4 h-4 text-rose-600" />
             <span>{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg('')}><X className="w-4 h-4" /></button>
+          <button onClick={() => setErrorMsg('')} className="text-rose-600 hover:text-rose-800"><X className="w-4 h-4" /></button>
         </div>
       )}
       {successMsg && (
-        <div className="p-4 bg-emerald-950/60 border border-emerald-800 rounded-xl text-emerald-200 text-xs flex items-center justify-between">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span>{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg('')}><X className="w-4 h-4" /></button>
+          <button onClick={() => setSuccessMsg('')} className="text-emerald-600 hover:text-emerald-800"><X className="w-4 h-4" /></button>
         </div>
       )}
 
       {/* User Table */}
       {viewMode === 'all' && (
-        <div className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden shadow-lg">
+        <div className="bg-[#FFFDFC] border border-[#E5E0DA] rounded-xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-stone-300">
-              <thead className="bg-stone-950 text-stone-400 text-xs uppercase font-mono border-b border-stone-800">
+            <table className="w-full text-left text-sm text-[#171717]">
+              <thead className="bg-[#F7F5F2] text-[#6B625C] text-xs uppercase font-mono border-b border-[#E5E0DA]">
                 <tr>
                   <th className="p-4">User</th>
                   <th className="p-4">Email</th>
@@ -215,60 +215,60 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-stone-800">
+              <tbody className="divide-y divide-[#E5E0DA]">
                 {filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-stone-500 text-xs">
+                    <td colSpan={6} className="p-8 text-center text-[#8A817A] text-xs">
                       No user accounts found.
                     </td>
                   </tr>
                 ) : (
                   filteredUsers.map((u) => (
-                    <tr key={u.id} className="hover:bg-stone-850/50 transition">
+                    <tr key={u.id} className="hover:bg-[#F7F5F2]/80 transition">
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <img
                             src={u.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${u.email}`}
                             alt=""
-                            className="w-9 h-9 rounded-full bg-stone-950 border border-stone-800 object-cover shrink-0"
+                            className="w-9 h-9 rounded-full bg-[#F7F5F2] border border-[#E5E0DA] object-cover shrink-0"
                           />
                           <div>
-                            <div className="font-serif font-bold text-white cursor-pointer hover:text-amber-400" onClick={() => startEdit(u)}>
+                            <div className="font-serif font-bold text-[#171717] cursor-pointer hover:text-[#EC008C]" onClick={() => startEdit(u)}>
                               {u.name}
                             </div>
-                            <div className="text-[11px] font-mono text-stone-500">@{u.username || 'user'}</div>
+                            <div className="text-[11px] font-mono text-[#6B625C]">@{u.username || 'user'}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="p-4 text-xs font-mono text-stone-400">{u.email}</td>
+                      <td className="p-4 text-xs font-mono text-[#6B625C]">{u.email}</td>
                       <td className="p-4">
-                        <span className="px-2 py-0.5 rounded bg-amber-400/10 text-amber-400 border border-amber-400/20 text-[10px] uppercase font-bold font-mono">
+                        <span className="px-2 py-0.5 rounded bg-pink-50 text-[#EC008C] border border-pink-200 text-[10px] uppercase font-bold font-mono">
                           {u.role}
                         </span>
                       </td>
                       <td className="p-4">
                         <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold font-mono ${
                           u.isActive
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-rose-50 text-rose-700 border border-rose-200'
                         }`}>
                           {u.isActive ? 'Active' : 'Disabled'}
                         </span>
                       </td>
-                      <td className="p-4 text-xs text-stone-500 font-mono">
+                      <td className="p-4 text-xs text-[#6B625C] font-mono">
                         {new Date(u.createdAt).toLocaleDateString()}
                       </td>
                       <td className="p-4 text-right space-x-1">
                         <button
                           onClick={() => startEdit(u)}
-                          className="p-1.5 bg-stone-800 hover:bg-amber-400 hover:text-stone-950 rounded text-stone-300 transition"
+                          className="p-1.5 bg-[#F3F0EC] hover:bg-[#EC008C] hover:text-white rounded text-[#171717] transition cursor-pointer"
                           title="Edit"
                         >
                           <Edit2 className="w-3.5 h-3.5" />
                         </button>
                         <button
                           onClick={() => handleDelete(u.id)}
-                          className="p-1.5 bg-stone-800 hover:bg-rose-600 hover:text-white rounded text-stone-400 transition"
+                          className="p-1.5 bg-[#F3F0EC] hover:bg-rose-600 hover:text-white rounded text-[#6B625C] transition cursor-pointer"
                           title="Delete"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
@@ -285,23 +285,23 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
 
       {/* User Edit Form */}
       {viewMode === 'edit' && (
-        <form onSubmit={handleSubmit} className="bg-stone-900 border border-stone-800 rounded-xl p-6 space-y-6">
-          <div className="flex items-center justify-between border-b border-stone-800 pb-4">
-            <h3 className="font-serif font-bold text-white text-lg">
+        <form onSubmit={handleSubmit} className="bg-[#FFFDFC] border border-[#E5E0DA] rounded-xl p-6 space-y-6 shadow-xs">
+          <div className="flex items-center justify-between border-b border-[#E5E0DA] pb-4">
+            <h3 className="font-serif font-bold text-[#171717] text-lg">
               {editingUser ? 'Edit User Credentials & Role' : 'Create User Account'}
             </h3>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setViewMode('all')}
-                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs font-semibold"
+                className="px-3 py-1.5 bg-[#F3F0EC] hover:bg-[#E5E0DA] text-[#171717] rounded-lg text-xs font-semibold cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-lg text-xs transition flex items-center gap-1.5"
+                className="px-4 py-1.5 bg-[#EC008C] hover:bg-pink-600 text-white font-bold rounded-lg text-xs transition flex items-center gap-1.5 cursor-pointer"
               >
                 {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
                 Save User
@@ -311,39 +311,39 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Full Name *</label>
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">Full Name *</label>
               <input
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-serif font-bold"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#171717] focus:outline-none focus:border-[#EC008C] font-serif font-bold"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Username</label>
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">Username</label>
               <input
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-amber-400 font-mono focus:outline-none focus:border-amber-400"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#EC008C] font-mono focus:outline-none focus:border-[#EC008C]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Email Address *</label>
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">Email Address *</label>
               <input
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#171717] focus:outline-none focus:border-[#EC008C]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">
                 {editingUser ? 'New Password (leave blank to keep current)' : 'Password *'}
               </label>
               <input
@@ -351,16 +351,16 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
                 required={!editingUser}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#171717] focus:outline-none focus:border-[#EC008C]"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Role Permission (RBAC)</label>
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">Role Permission (RBAC)</label>
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value as Role)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#171717] focus:outline-none focus:border-[#EC008C]"
               >
                 <option value="ADMIN">ADMIN (Full Permissions)</option>
                 <option value="EDITOR">EDITOR (Manage Content & Taxonomy)</option>
@@ -370,22 +370,22 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Avatar URL</label>
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">Avatar URL</label>
               <input
                 type="text"
                 value={avatar}
                 onChange={(e) => setAvatar(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#171717] focus:outline-none focus:border-[#EC008C]"
               />
             </div>
 
             <div className="md:col-span-2">
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Bio / Author Description</label>
+              <label className="block text-xs font-mono uppercase text-[#6B625C] mb-1">Bio / Author Description</label>
               <textarea
                 rows={3}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
+                className="w-full bg-white border border-[#DDD6D0] rounded-lg p-2.5 text-xs text-[#171717] focus:outline-none focus:border-[#EC008C]"
               />
             </div>
 
@@ -395,9 +395,9 @@ export const UsersManager: React.FC<UsersManagerProps> = ({
                 id="userActive"
                 checked={isActive}
                 onChange={(e) => setIsActive(e.target.checked)}
-                className="accent-amber-400 rounded"
+                className="accent-[#EC008C] rounded"
               />
-              <label htmlFor="userActive" className="text-xs text-white uppercase font-mono">
+              <label htmlFor="userActive" className="text-xs text-[#171717] uppercase font-mono">
                 Account is Active and Allowed to Login
               </label>
             </div>

@@ -14,7 +14,7 @@ export function MoreForYou({ posts, variant = 'sidebar' }: MoreForYouProps) {
       <h2 id={`${variant}-more-for-you-title`} className="more-for-you__title">More for You</h2>
       <div className="more-for-you__list">
         {posts.map((post) => (
-          <Link key={post.id} href={`/${post.slug}`} className="more-for-you__item">
+          <Link key={post.id} href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`} className="more-for-you__item">
             <img
               src={post.featuredImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=600&q=80'}
               alt=""

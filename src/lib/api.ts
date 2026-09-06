@@ -91,17 +91,82 @@ export const api = {
     offset?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
+    dateFilter?: string;
+    dateFrom?: string;
+    dateTo?: string;
   }) => {
     const query = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, val]) => {
-        if (val !== undefined && val !== null) {
+        if (val !== undefined && val !== null && val !== '') {
           query.set(key, String(val));
         }
       });
     }
     return fetchJson<Post[]>(`${API_BASE}/posts?${query.toString()}`);
   },
+
+  getPostsPaginated: (params?: {
+    status?: string;
+    categoryId?: string;
+    subCategoryId?: string;
+    categorySlug?: string;
+    tagSlug?: string;
+    authorId?: string;
+    search?: string;
+    isFeatured?: boolean;
+    isTrending?: boolean;
+    isEditorPick?: boolean;
+    limit?: number;
+    offset?: number;
+    page?: number;
+    sortBy?: string;
+    sortOrder?: 'asc' | 'desc';
+    dateFilter?: string;
+    dateFrom?: string;
+    dateTo?: string;
+  }) => {
+    const query = new URLSearchParams();
+    query.set('paginate', 'true');
+    if (params) {
+      Object.entries(params).forEach(([key, val]) => {
+        if (val !== undefined && val !== null && val !== '') {
+          query.set(key, String(val));
+        }
+      });
+    }
+    return fetchJson<{
+      posts: Post[];
+      total: number;
+      page: number;
+      limit: number;
+      totalPages: number;
+      counts: {
+        all: number;
+        published: number;
+        draft: number;
+        scheduled: number;
+        pending: number;
+        trash: number;
+      };
+    }>(`${API_BASE}/posts?${query.toString()}`);
+  },
+
+  duplicatePost: (id: string) =>
+    fetchJson<Post>(`${API_BASE}/posts/${id}/duplicate`, {
+      method: 'POST',
+    }),
+
+  bulkPosts: (data: {
+    action: 'trash' | 'restore' | 'delete' | 'publish' | 'draft' | 'pending' | 'scheduled' | 'category' | 'duplicate';
+    postIds: string[];
+    categoryId?: string;
+    scheduledAt?: string;
+  }) =>
+    fetchJson<{ success: boolean; count: number; message: string }>(`${API_BASE}/posts/bulk`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 
   getPostBySlug: (slug: string) => fetchJson<Post>(`${API_BASE}/posts/${slug}`),
 

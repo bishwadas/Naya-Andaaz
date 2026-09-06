@@ -1,5 +1,5 @@
 /**
- * Sereia News & Content Management System
+ * Naya Andaaz News & Content Management System
  * Core TypeScript Definitions & Domain Models
  */
 
@@ -15,6 +15,7 @@ export interface User {
   name: string;
   username: string;
   email: string;
+  passwordHash?: string;
   role: UserRole;
   avatar: string;
   bio?: string;
@@ -111,6 +112,7 @@ export interface Post {
   tagIds: string[];
   tags: Tag[];
   status: PostStatus;
+  isTrashed?: boolean;
   isFeatured: boolean;
   isTrending: boolean;
   isEditorPick: boolean;
@@ -165,6 +167,63 @@ export interface Comment {
   createdAt: string;
 }
 
+export interface SocialLinkItem {
+  id: string;
+  platform: string; // 'facebook' | 'instagram' | 'twitter' | 'youtube' | 'pinterest' | 'linkedin' | 'threads' | 'tiktok' | 'custom' | string;
+  label?: string;
+  url: string;
+  isEnabled: boolean;
+  order?: number;
+}
+
+export interface AboutUsCategoryItem {
+  id: string;
+  name: string;
+  description?: string;
+  icon: string;
+}
+
+export interface AboutUsConfig {
+  heroTitle: string;
+  heroDescription: string;
+  aboutSection: {
+    title: string;
+    description: string;
+  };
+  whatWeCover: {
+    title: string;
+    categories: AboutUsCategoryItem[];
+  };
+  mission: {
+    title: string;
+    description: string;
+  };
+  editorialApproach: {
+    title: string;
+    description: string;
+    bulletPoints: string[];
+  };
+  whyNayaAndaaz: {
+    title: string;
+    paragraphs: string[];
+  };
+  readers: {
+    title: string;
+    description: string;
+  };
+  commitment: {
+    title: string;
+    description: string;
+    subDescription: string;
+  };
+  contact: {
+    title: string;
+    description: string;
+    buttonText: string;
+    buttonUrl: string;
+  };
+}
+
 export interface SiteSettings {
   siteName: string;
   siteTitle?: string;
@@ -172,6 +231,11 @@ export interface SiteSettings {
   siteDescription: string;
   siteUrl: string;
   logo: string;
+  logo_url?: string;
+  logoPrimary?: string;
+  logoMobile?: string;
+  logoFooter?: string;
+  footer_logo_url?: string;
   logoDark?: string;
   favicon: string;
   postsPerPage: number;
@@ -185,6 +249,7 @@ export interface SiteSettings {
   searchConsoleVerification?: string;
   
   // Social links
+  socialLinks?: SocialLinkItem[];
   facebookUrl?: string;
   twitterUrl?: string;
   instagramUrl?: string;
@@ -197,10 +262,17 @@ export interface SiteSettings {
   sidebarAdHtml?: string;
   inArticleAdHtml?: string;
   enableAds: boolean;
+  showOurAuthorsOnAuthorPage?: boolean;
   
   // Contact & Footer
   contactEmail: string;
   copyrightText: string;
+
+  // About Us Config
+  aboutUs?: AboutUsConfig;
+
+  // Privacy Policy Config
+  privacy_policy_page?: any;
 }
 
 export interface ActivityLog {

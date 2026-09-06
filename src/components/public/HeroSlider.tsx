@@ -6,6 +6,7 @@ import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
 import { Category, Post } from '@/types';
 import { getPostCategoryUrl } from '@/lib/categories';
+import { getOptimizedImageUrl, getResponsiveImageSrcSet } from '@/lib/images';
 
 import 'swiper/css';
 import 'swiper/css/pagination';
@@ -49,12 +50,16 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ posts, categories }) => 
         preventClicksPropagation={true}
         className="w-full rounded-none"
       >
-        {sliderPosts.map((post) => {
+        {sliderPosts.map((post, index) => {
           const categorySlug = post.subCategory?.slug || post.category?.slug || '';
           const categoryName = post.subCategory?.name || post.category?.name || 'Featured';
-          const imageUrl =
+          const rawImageUrl =
             post.featuredImage ||
             'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80';
+          
+          const isLcp = index === 0;
+          const optimizedSrc = getOptimizedImageUrl(rawImageUrl, isLcp ? 720 : 640);
+          const srcSet = getResponsiveImageSrcSet(rawImageUrl, [360, 480, 640, 800, 1024]);
 
           return (
             <SwiperSlide key={post.id} className="w-full">
@@ -62,17 +67,22 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ posts, categories }) => 
               <div className="w-full select-none" id={`hero-slide-${post.id}`}>
                 {/* 1. Featured Image Link: Clickable (opens article) */}
                 <Link
-                  href={`/${post.slug}`}
-                  className="block relative aspect-[16/9] w-full overflow-hidden bg-gray-100 group"
+                  href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
+                  className="block relative aspect-[16/9] w-full overflow-hidden bg-stone-100 group"
                   id={`hero-slide-img-link-${post.id}`}
                 >
                   <img
-                    src={imageUrl}
+                    src={optimizedSrc}
+                    srcSet={srcSet}
+                    sizes="(max-width: 640px) 100vw, (max-width: 1024px) 55vw, 720px"
                     alt={post.title}
-                    width="1200"
-                    height="675"
+                    width={720}
+                    height={405}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 ease-out"
-                    loading="eager"
+                    loading={isLcp ? 'eager' : 'lazy'}
+                    decoding={isLcp ? 'sync' : 'async'}
+                    // @ts-ignore
+                    fetchPriority={isLcp ? 'high' : 'auto'}
                   />
                 </Link>
 
@@ -82,7 +92,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ posts, categories }) => 
                   {categorySlug ? (
                     <Link
                       href={getPostCategoryUrl(post, categories)}
-                      className="text-pink-600 font-bold uppercase tracking-wider text-xs block mb-1 hover:underline"
+                      className="text-pink-600 font-bold uppercase tracking-wider text-xs block mb-1 category-link"
                       id={`hero-slide-cat-${post.id}`}
                     >
                       {categoryName}
@@ -98,7 +108,7 @@ export const HeroSlider: React.FC<HeroSliderProps> = ({ posts, categories }) => 
 
                   {/* 3. Post Title Link: Clickable (opens article) */}
                   <Link
-                    href={`/${post.slug}`}
+                    href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
                     className="group inline-block"
                     id={`hero-slide-title-link-${post.id}`}
                   >

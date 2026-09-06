@@ -3,9 +3,9 @@
 @import "swiper/css/pagination";
 
 @theme {
-  --font-sans: Mukta, "Mukta Fallback", sans-serif;
-  --font-serif: Mukta, "Mukta Fallback", sans-serif;
-  --font-mono: Mukta, "Mukta Fallback", monospace, sans-serif;
+  --font-sans: var(--font-mukta), Mukta, "Mukta Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-serif: var(--font-mukta), Mukta, "Mukta Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-mukta), Mukta, "Mukta Fallback", monospace, sans-serif;
 }
 
 @layer base {
@@ -13,7 +13,7 @@
   *,
   ::before,
   ::after {
-    font-family: Mukta, "Mukta Fallback", sans-serif;
+    font-family: var(--font-mukta), Mukta, "Mukta Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   }
 
   /* Keep inline SVGs constrained when Tailwind utilities are unavailable during HMR. */
@@ -24,9 +24,19 @@
   body {
     background-color: #ffffff;
     color: #111827;
-    font-family: Mukta, "Mukta Fallback", sans-serif !important;
+    font-family: var(--font-mukta), Mukta, "Mukta Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background: #FCE7F3;
+    color: #111111;
+  }
+
+  ::-moz-selection {
+    background: #FCE7F3;
+    color: #111111;
   }
 
   h1,
@@ -50,16 +60,10 @@
   .font-serif,
   .font-sans,
   .font-mono {
-    font-family: Mukta, "Mukta Fallback", sans-serif !important;
+    font-family: var(--font-mukta), Mukta, "Mukta Fallback", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   }
 }
 
-/*
- * Explicit dimensions for the editorial accent SVG. Tailwind normally supplies
- * these through `w-9 sm:w-11 h-2`, but keeping a small CSS fallback prevents the
- * browser's default 300x150 SVG size from taking over if generated utilities
- * are briefly unavailable during development/HMR.
- */
 .section-heading-accent {
   display: block;
   width: 2.25rem;
@@ -90,6 +94,61 @@
   top: 1.5rem;
 }
 
+/* Article content image responsive sizing & proportional scaling */
+#article-content-body > figure:not(.gallery-item-figure) img,
+#article-content-body > img,
+#article-content-body p > img,
+.prose-content img,
+figure.wp-block-image img,
+.wp-block-image img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  max-height: none !important;
+  object-fit: contain !important;
+  display: block !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: none !important;
+}
+
+/* Ensure figure containers within article body span full width without box borders */
+#article-content-body > figure:not(.gallery-item-figure),
+.prose-content figure,
+figure.wp-block-image,
+.wp-block-image {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+/* Author avatar must remain perfectly circular */
+img.rounded-full,
+.rounded-full img,
+.author-avatar img {
+  border-radius: 50% !important;
+  object-fit: cover !important;
+}
+
+article figure,
+#article-content-body figure,
+.prose-content figure {
+  box-shadow: none !important;
+}
+
+/* Delete/hide all image titles/captions under images on the article page */
+article figcaption,
+#article-content-body figcaption,
+.prose-content figcaption,
+figure figcaption {
+  display: none !important;
+}
+
 .more-for-you {
   background: #fdf0f7;
   border: 1px solid #f8c8df;
@@ -117,7 +176,7 @@
 }
 
 .more-for-you__item:last-child { border-bottom: 0; padding-bottom: 0; }
-.more-for-you__image { width: 7.5rem; height: 5rem; flex: 0 0 7.5rem; object-fit: cover; }
+.more-for-you__image { width: 7.5rem; height: 5rem; flex: 0 0 7.5rem; object-fit: cover; border-radius: 0; }
 .more-for-you__copy { min-width: 0; }
 .more-for-you__category { display: block; margin-bottom: .2rem; color: #db2777; font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .more-for-you__copy h3 { margin: 0; font-size: 1rem; line-height: 1.25; font-weight: 700; }
@@ -132,9 +191,17 @@
 
 @media (max-width: 640px) {
   .article-page { padding-left: 1rem; padding-right: 1rem; }
-  .more-for-you { padding: 1rem; }
+  .more-for-you {
+    padding: 1rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    width: auto;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
   .more-for-you__item { gap: .75rem; }
-  .more-for-you__image { width: 6.5rem; height: 4.5rem; flex-basis: 6.5rem; }
+  .more-for-you__image { width: 6.5rem; height: 4.5rem; flex-basis: 6.5rem; border-radius: 0; }
   .more-for-you__copy h3 { font-size: .95rem; }
 }
 
@@ -186,6 +253,21 @@
   text-decoration-line: underline;
 }
 
+/* Category link underline interaction effect on Home Page */
+#homepage-main-content .category-link {
+  text-decoration: none;
+  text-decoration-color: currentColor;
+  text-decoration-thickness: 1.5px;
+  text-underline-offset: 4px;
+  transition: text-decoration-color 180ms ease;
+}
+
+#homepage-main-content .category-link:hover,
+#homepage-main-content .category-link:focus-visible,
+#homepage-main-content .category-link:active {
+  text-decoration-line: underline;
+}
+
 /* Swiper custom pagination styles */
 .hero-bullet,
 .custom-hero-pagination .hero-bullet {
@@ -221,6 +303,29 @@
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
+}
+
+/* Eradicate unwanted focus outlines and borders on Recharts SVG / canvas elements */
+.recharts-wrapper,
+.recharts-surface,
+.recharts-responsive-container,
+.recharts-legend-wrapper,
+.recharts-tooltip-wrapper,
+.recharts-wrapper *:focus,
+.recharts-wrapper *:focus-visible,
+.recharts-surface *:focus,
+.recharts-surface *:focus-visible,
+.recharts-responsive-container *:focus,
+.recharts-responsive-container *:focus-visible,
+svg.recharts-surface,
+svg.recharts-surface:focus,
+svg.recharts-surface:focus-visible,
+svg:focus,
+svg:focus-visible {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent !important;
 }
 
 ::-webkit-scrollbar-track {

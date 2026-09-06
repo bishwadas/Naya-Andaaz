@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/db';
-import { menuItems } from '@/db/schema';
-import { eq } from 'drizzle-orm';
+import { deleteMenuItem, updateMenuItem } from '@/db/repository';
 import { authorizeRequest } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
-
 
 export async function DELETE(
   _req: NextRequest,
@@ -18,11 +15,11 @@ export async function DELETE(
     }
 
     const { id } = await params;
-    await db.delete(menuItems).where(eq(menuItems.id, id));
+    await deleteMenuItem(id);
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('Error deleting menu item:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: 'Unable to delete menu item. Please try again.' }, { status: 500 });
   }
 }
 
@@ -38,20 +35,18 @@ export async function PUT(
 
     const { id } = await params;
     const body = await req.json();
-    const [updated] = await db
-      .update(menuItems)
-      .set({
-        label: body.label,
-        url: body.url,
-        categorySlug: body.categorySlug,
-        order: body.order,
-      })
-      .where(eq(menuItems.id, id))
-      .returning();
+    const updated = await updateMenuItem(id, {
+      label: body.label,
+      url: body.url,
+      categorySlug: body.categorySlug,
+      parentId: body.parentId,
+      order: body.order,
+      target: body.target,
+    });
 
     return NextResponse.json(updated);
   } catch (error: any) {
     console.error('Error updating menu item:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Unable to update menu item. Please try again.' }, { status: 500 });
   }
 }

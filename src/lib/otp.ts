@@ -3,7 +3,7 @@ import { eq, and, sql, desc } from 'drizzle-orm';
 import { db } from '@/db';
 import { otps } from '@/db/schema';
 
-export type OtpPurpose = 'signup' | 'reset_password';
+export type OtpPurpose = 'signup' | 'signin' | 'reset_password';
 
 export interface CreateOtpResult {
   success: boolean;

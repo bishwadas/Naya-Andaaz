@@ -59,7 +59,7 @@ export const NewsletterManager: React.FC = () => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', 'sereia_newsletter_subscribers.csv');
+    link.setAttribute('download', 'naya_andaaz_newsletter_subscribers.csv');
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
         'If an unverified account exists with this email address, a new verification link has been sent.',
     });
   } catch (error: any) {
-    console.error('Resend verification error:', error);
+    console.error('Email verification error:', error);
     return NextResponse.json(
       { success: false, error: 'Failed to process verification request.' },
       { status: 500 }

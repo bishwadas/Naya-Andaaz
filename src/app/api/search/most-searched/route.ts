@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getMostSearchedTerms, recordSearchQuery } from '@/db/repository';
+import { getMostSearchedTerms, recordSearchQuery, isValidSearchTerm } from '@/db/repository';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,8 +14,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const { query } = await req.json();
-    if (query && typeof query === 'string') {
+    const body = await req.json().catch(() => ({}));
+    const query = body?.query;
+    if (query && typeof query === 'string' && isValidSearchTerm(query)) {
       await recordSearchQuery(query);
     }
     const terms = await getMostSearchedTerms();

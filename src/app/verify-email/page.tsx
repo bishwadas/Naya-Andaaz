@@ -59,7 +59,7 @@ function VerifyEmailContent() {
   };
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative selection:bg-amber-400 selection:text-stone-950">
+    <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative">
       {/* Background Decorative Accent */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 bg-amber-500/10 rounded-full blur-3xl" />
@@ -70,18 +70,15 @@ function VerifyEmailContent() {
         {/* Brand Header */}
         <div className="text-center">
           <Link href="/" className="inline-flex items-center gap-2 group">
-            <span className="font-serif text-3xl font-black tracking-wider bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 bg-clip-text text-transparent">
-              SEREIA
-            </span>
-            <span className="text-[10px] uppercase tracking-widest bg-stone-900 border border-stone-800 text-amber-400 px-2 py-0.5 rounded font-mono font-bold">
-              Gazette
+            <span className="font-serif text-2xl sm:text-3xl font-black tracking-wider bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200 bg-clip-text text-transparent">
+              NAYA ANDAAZ
             </span>
           </Link>
           <h2 className="mt-4 text-2xl font-serif font-bold text-stone-100">
             Email Verification
           </h2>
           <p className="mt-1.5 text-xs sm:text-sm text-stone-400">
-            Confirm your Sereia account to unlock full membership features
+            Confirm your Naya Andaaz account to unlock full membership features
           </p>
         </div>
 

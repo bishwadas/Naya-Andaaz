@@ -1,11 +1,14 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { Tag as TagIcon, Clock, Eye, ArrowLeft } from 'lucide-react';
+import { Home, ChevronRight, Loader2 } from 'lucide-react';
 import { Category, MenuItem, Post, SiteSettings, Tag } from '@/types';
 import { Navbar } from '@/components/public/Navbar';
 import { Footer } from '@/components/public/Footer';
+import { getPostCategoryUrl } from '@/lib/categories';
+import { generateBreadcrumbJsonLd, generateCollectionJsonLd } from '@/lib/seo';
+import { getOptimizedImageUrl } from '@/lib/images';
 
 interface TagArchiveViewProps {
   tag: Tag;
@@ -13,95 +16,259 @@ interface TagArchiveViewProps {
   categories: Category[];
   settings: SiteSettings;
   primaryMenuItems?: MenuItem[];
+  initialMostSearchedTerms?: string[];
 }
 
-export function TagArchiveView({ tag, posts, categories, settings, primaryMenuItems }: TagArchiveViewProps) {
+const DEFAULT_MOST_SEARCHED = [
+  'Friday OTT Releases',
+  'XO Kitty Season 3 Twitter Review',
+  'Crime 101',
+  'Sitaare Zameen Par OTT Release',
+  'OTT Releases This Week',
+  'Punjabi Movie Download Website',
+  'Hollywood Series Download',
+  'Websites To Watch Bollywood Movies',
+  'Websites To Download South Indian Movies',
+  'Websites To Download Tamil Dubbed Movies',
+];
+
+export function TagArchiveView({
+  tag,
+  posts,
+  categories,
+  settings,
+  primaryMenuItems,
+  initialMostSearchedTerms,
+}: TagArchiveViewProps) {
+  // Infinite scroll batch state (initial batch of 9 for 3-column desktop grid)
+  const [displayCount, setDisplayCount] = useState(9);
+  const [isLoading, setIsLoading] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
+
+  // Dynamic Most Searched terms from database
+  const [mostSearchedTerms, setMostSearchedTerms] = useState<string[]>(
+    initialMostSearchedTerms && initialMostSearchedTerms.length > 0
+      ? initialMostSearchedTerms
+      : DEFAULT_MOST_SEARCHED
+  );
+
+  // Fetch updated search terms on mount
+  useEffect(() => {
+    let isMounted = true;
+    fetch('/api/search/most-searched')
+      .then((res) => res.json())
+      .then((data) => {
+        if (isMounted && data && Array.isArray(data.terms) && data.terms.length > 0) {
+          setMostSearchedTerms(data.terms);
+        }
+      })
+      .catch((err) => {
+        console.error('Error fetching most searched terms:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Infinite Scroll IntersectionObserver logic
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && displayCount < posts.length && !isLoading) {
+          setIsLoading(true);
+          setTimeout(() => {
+            setDisplayCount((prev) => Math.min(prev + 6, posts.length));
+            setIsLoading(false);
+          }, 350);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => {
+      if (observerTarget.current) {
+        observer.unobserve(observerTarget.current);
+      }
+    };
+  }, [displayCount, posts.length, isLoading]);
+
+  const displayedPosts = posts.slice(0, displayCount);
+
+  const breadcrumbItems = [
+    { name: 'Home', url: '/' },
+    { name: 'Tags', url: '/tags' },
+    { name: tag.name, url: `/tags/${tag.slug}` },
+  ];
+  const breadcrumbSchema = generateBreadcrumbJsonLd(breadcrumbItems, settings);
+
+  const collectionSchema = generateCollectionJsonLd(
+    `#${tag.name}`,
+    tag.description || `Explore latest stories, news, and features tagged #${tag.name}`,
+    `/tags/${tag.slug}`,
+    posts,
+    settings
+  );
+
   return (
-    <div className="min-h-screen bg-stone-50 text-stone-900 font-sans antialiased">
+    <div className="min-h-screen bg-white text-stone-900 font-sans antialiased flex flex-col">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(breadcrumbSchema),
+        }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(collectionSchema),
+        }}
+      />
       <Navbar categories={categories} settings={settings} primaryMenuItems={primaryMenuItems} />
 
-      <main className="breadcrumb-page-main max-w-7xl mx-auto px-4 sm:px-6 pb-12">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-xs font-semibold text-stone-500 uppercase tracking-wider mb-6">
-          <Link href="/" className="hover:text-amber-600 transition flex items-center gap-1">
-            <ArrowLeft className="w-3.5 h-3.5" /> Home
+      {/* Main Container - Generous spacing below Navbar matching Sub-Category Page */}
+      <main className="breadcrumb-page-main flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16 w-full">
+        {/* Breadcrumb Navigation */}
+        <nav className="flex items-center gap-2 text-xs sm:text-sm text-stone-600 font-medium mb-6">
+          <Link href="/" className="hover:text-[#db2777] transition flex items-center gap-1">
+            <Home className="w-3.5 h-3.5" />
           </Link>
-          <span>/</span>
-          <span className="text-stone-900">Tag: #{tag.name}</span>
-        </div>
+          <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+          <span className="text-stone-600">Tags</span>
+          <ChevronRight className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+          <span className="text-stone-900 font-semibold">{tag.name}</span>
+        </nav>
 
-        {/* Tag Header */}
-        <div className="bg-white border border-stone-200 rounded-2xl p-8 mb-10 shadow-sm">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-3 bg-amber-500/10 text-amber-600 rounded-xl">
-              <TagIcon className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="text-3xl font-serif font-bold text-stone-950">#{tag.name}</h1>
-              <p className="text-xs text-stone-500 mt-0.5">
-                {posts.length} {posts.length === 1 ? 'story' : 'stories'} published under this tag
-              </p>
-            </div>
+        {/* Tag Header with Pink Accent Bar matching Sub-Category Page */}
+        <div className="mb-8 pb-4">
+          <div className="flex items-center gap-3.5 mb-2">
+            <div className="w-1.5 h-8 sm:h-10 md:h-11 bg-[#db2777] shrink-0 rounded-none"></div>
+            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black text-stone-950 tracking-tight">
+              {tag.name}
+            </h1>
           </div>
           {tag.description && (
-            <p className="text-sm text-stone-600 mt-2 max-w-2xl leading-relaxed">{tag.description}</p>
+            <p className="text-stone-600 text-sm sm:text-base mt-2 font-serif max-w-3xl leading-relaxed pl-5">
+              {tag.description}
+            </p>
           )}
         </div>
 
-        {/* Posts Grid */}
-        {posts.length === 0 ? (
-          <div className="bg-white border border-stone-200 rounded-xl p-12 text-center text-stone-500">
-            <p className="text-base font-serif">No stories found with tag #{tag.name}.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {posts.map((post) => (
-              <Link
-                key={post.id}
-                href={`/${post.slug}`}
-                className="group bg-white border border-stone-200 rounded-xl overflow-hidden hover:shadow-lg transition flex flex-col"
-              >
-                <div className="aspect-[16/9] overflow-hidden bg-stone-100 relative">
-                  <img
-                    src={
+        {/* Main Content Layout: Posts Grid (Left) + Most Searched Sidebar (Right) */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Left Main Content Area */}
+          <div className="lg:col-span-8 xl:col-span-9">
+            {posts.length === 0 ? (
+              <div className="text-center py-20 bg-stone-50 rounded-none border border-stone-200 p-8">
+                <h3 className="text-xl font-bold text-stone-800 mb-2">No stories found</h3>
+                <p className="text-stone-500 mb-6">
+                  There are currently no published articles with tag {tag.name}.
+                </p>
+                <Link
+                  href="/"
+                  className="inline-flex items-center px-5 py-2.5 bg-stone-900 text-white text-xs font-bold uppercase tracking-wider hover:bg-[#db2777] transition"
+                >
+                  Explore Homepage
+                </Link>
+              </div>
+            ) : (
+              <>
+                {/* Editorial Post Grid: 3-column grid on desktop, sharp rectangular images, clean typography */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-x-6 gap-y-10">
+                  {displayedPosts.map((post) => {
+                    const postCat = post.subCategory || post.category;
+                    const rawImage =
                       post.featuredImage ||
-                      'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80'
-                    }
-                    alt={post.title}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                  />
-                  {post.category && (
-                    <span className="absolute top-3 left-3 bg-stone-950/80 backdrop-blur-md text-white text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded">
-                      {post.category.name}
-                    </span>
+                      'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=800&q=80';
+                    const optimizedImg = getOptimizedImageUrl(rawImage, 600);
+
+                    return (
+                      <article key={post.id} className="group flex flex-col">
+                        {/* Sharp Rectangular Image - No rounded corners, no card border, no shadow */}
+                        <Link
+                          href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
+                          className="block overflow-hidden bg-stone-100 aspect-[16/10] w-full mb-3"
+                        >
+                          <img
+                            src={optimizedImg}
+                            alt={post.title}
+                            width={600}
+                            height={375}
+                            className="w-full h-full object-cover rounded-none transition-transform duration-300 group-hover:scale-[1.02]"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        </Link>
+
+                        {/* Category Label - Pink Accent Text */}
+                        {postCat && (
+                          <Link
+                            href={getPostCategoryUrl(post, categories)}
+                            className="text-[#db2777] hover:underline decoration-[#db2777] font-medium text-xs sm:text-[13px] tracking-wide inline-block mb-1 text-left uppercase"
+                          >
+                            {postCat.name}
+                          </Link>
+                        )}
+
+                        {/* Post Title - Strong Headline with Hover Underline */}
+                        <h2 className="font-bold text-base sm:text-[17px] text-stone-950 leading-snug tracking-tight text-left">
+                          <Link
+                            href={`/${post.subCategory?.slug || 'uncategorized'}/${post.slug}`}
+                            className="hover:underline decoration-stone-900 underline-offset-2 transition-colors duration-150"
+                          >
+                            {post.title}
+                          </Link>
+                        </h2>
+                      </article>
+                    );
+                  })}
+                </div>
+
+                {/* Infinite Scroll Indicator & Trigger */}
+                <div ref={observerTarget} className="py-12 flex flex-col items-center justify-center w-full min-h-[60px]">
+                  {isLoading && (
+                    <div className="flex items-center gap-2 text-stone-600 text-sm font-medium">
+                      <Loader2 className="w-4 h-4 text-[#db2777] animate-spin" />
+                      <span>Loading...</span>
+                    </div>
+                  )}
+                  {displayCount >= posts.length && posts.length > 0 && !isLoading && (
+                    <div className="text-center text-stone-400 text-xs uppercase tracking-widest py-4 border-t border-stone-100 w-full mt-6">
+                      End of dispatches
+                    </div>
                   )}
                 </div>
-                <div className="p-6 flex-1 flex flex-col justify-between space-y-4">
-                  <div className="space-y-2">
-                    <h3 className="font-serif font-bold text-stone-950 text-lg group-hover:text-amber-600 transition leading-snug line-clamp-2">
-                      {post.title}
-                    </h3>
-                    {post.excerpt && (
-                      <p className="text-xs text-stone-600 line-clamp-3 leading-relaxed">
-                        {post.excerpt}
-                      </p>
-                    )}
-                  </div>
-                  <div className="pt-4 border-t border-stone-100 flex items-center justify-between text-[11px] text-stone-500">
-                    <span className="font-medium text-stone-800">{post.author?.name || 'Sereia Editorial'}</span>
-                    <div className="flex items-center gap-3">
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {post.readingTime || 3}m</span>
-                      <span className="flex items-center gap-1"><Eye className="w-3 h-3" /> {post.views || 0}</span>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            ))}
+              </>
+            )}
           </div>
-        )}
+
+          {/* Right Sidebar: MOST SEARCHED Section */}
+          <aside className="lg:col-span-4 xl:col-span-3">
+            <div className="lg:sticky lg:top-32 bg-white pt-2 sm:pt-0">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-stone-700 pb-2.5 border-b border-stone-200 mb-4">
+                MOST SEARCHED
+              </h3>
+              <div className="flex flex-wrap gap-2">
+                {mostSearchedTerms.slice(0, 10).map((term, idx) => (
+                  <Link
+                    key={`most-searched-${idx}`}
+                    href={`/search?q=${encodeURIComponent(term)}`}
+                    className="inline-block bg-stone-100/90 hover:bg-pink-50 text-stone-700 hover:text-[#db2777] text-xs font-medium px-3.5 py-1.5 rounded-full transition-all duration-150 border border-stone-200/60 shadow-2xs"
+                  >
+                    {term}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
       </main>
 
-      <Footer categories={categories} settings={settings} />
+      <Footer settings={settings} categories={categories} />
     </div>
   );
 }

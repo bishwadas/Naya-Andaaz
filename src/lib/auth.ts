@@ -16,6 +16,15 @@ export interface SessionPayload {
   email: string;
   role: Role;
   name: string;
+  lastActive?: number; // Unix timestamp in milliseconds
+}
+
+export const PRIVILEGED_INACTIVITY_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+export function isPrivilegedRole(role?: string | null): boolean {
+  if (!role) return false;
+  const r = role.toLowerCase().trim();
+  return r === 'admin' || r === 'superadmin' || r === 'editor' || r === 'author';
 }
 
 export function sanitizeUser(user: any): User {
@@ -24,13 +33,18 @@ export function sanitizeUser(user: any): User {
   return safeUser as User;
 }
 
-export async function createSessionToken(user: { id: string; email: string; role: Role; name: string }): Promise<string> {
+export async function createSessionToken(
+  user: { id: string; email: string; role: Role; name: string },
+  lastActive?: number
+): Promise<string> {
   const secret = getSessionSecret();
+  const now = Date.now();
   return new SignJWT({
     userId: user.id,
     email: user.email,
     role: user.role,
     name: user.name,
+    lastActive: typeof lastActive === 'number' ? lastActive : now,
   })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -42,7 +56,20 @@ export async function verifySessionToken(token: string): Promise<SessionPayload 
   try {
     const secret = getSessionSecret();
     const { payload } = await jwtVerify(token, secret);
-    return payload as unknown as SessionPayload;
+    const session = payload as unknown as SessionPayload;
+
+    // Check 10-minute inactivity timeout ONLY for privileged roles (ADMIN, SUPERADMIN, EDITOR, AUTHOR)
+    if (isPrivilegedRole(session.role)) {
+      const now = Date.now();
+      const lastActive = typeof session.lastActive === 'number' ? session.lastActive : null;
+
+      // If lastActive is missing or older than 10 minutes of inactivity, privileged session is expired
+      if (!lastActive || now - lastActive > PRIVILEGED_INACTIVITY_TIMEOUT_MS) {
+        return null;
+      }
+    }
+
+    return session;
   } catch (error) {
     return null;
   }
@@ -61,6 +88,14 @@ export async function setSessionCookie(token: string) {
 
 export async function clearSessionCookie() {
   const cookieStore = await cookies();
+  cookieStore.set(COOKIE_NAME, '', {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/',
+    maxAge: 0,
+    expires: new Date(0),
+  });
   cookieStore.delete(COOKIE_NAME);
 }
 
@@ -118,7 +153,9 @@ export async function hashPassword(plainText: string): Promise<string> {
 }
 
 export async function verifyPassword(plainText: string, hashed: string): Promise<boolean> {
-  if (!hashed || typeof hashed !== 'string') return false;
+  if (!plainText || !hashed || typeof plainText !== 'string' || typeof hashed !== 'string') {
+    return false;
+  }
   if (hashed.startsWith('$2a$') || hashed.startsWith('$2b$') || hashed.startsWith('$2y$')) {
     try {
       return await bcrypt.compare(plainText, hashed);
@@ -126,8 +163,7 @@ export async function verifyPassword(plainText: string, hashed: string): Promise
       return false;
     }
   }
-  // Safe fallback if stored password was plain text from legacy insertion
-  return plainText === hashed;
+  return false;
 }
 
 // RBAC Hierarchy

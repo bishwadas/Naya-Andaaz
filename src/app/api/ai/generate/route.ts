@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
       model: 'gemini-2.5-flash',
       contents: userPrompt,
       config: {
-        systemInstruction: 'You are an expert editorial writer for Sereia, an elite digital journalism publication. Provide well-structured, insightful, high-caliber articles in clean HTML format with <h2>, <h3>, <p>, <blockquote>, and <ul>.',
+        systemInstruction: 'You are an expert editorial writer for Naya Andaaz, an inspiring digital lifestyle and culture publication. Provide well-structured, insightful, high-caliber articles in clean HTML format with <h2>, <h3>, <p>, <blockquote>, and <ul>.',
         temperature: 0.7,
       },
     });

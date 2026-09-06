@@ -1,6 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   FileCode,
   Plus,
@@ -11,7 +12,12 @@ import {
   AlertCircle,
   CheckCircle2,
   RefreshCw,
-  Check
+  Eye,
+  ExternalLink,
+  Calendar,
+  Layers,
+  Database,
+  FileText
 } from 'lucide-react';
 import { Page, PageStatus } from '@/types';
 import { parseApiResponse } from '@/lib/api';
@@ -27,22 +33,11 @@ export const PagesManager: React.FC<PagesManagerProps> = ({
   initialMode = 'all',
   onPagesUpdated,
 }) => {
+  const router = useRouter();
   const [pages, setPages] = useState<Page[]>(initialPages);
-  const [viewMode, setViewMode] = useState<'all' | 'edit'>(initialMode === 'add' ? 'edit' : 'all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [editingPage, setEditingPage] = useState<Page | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [loading, setLoading] = useState(false);
-
-  // Form states
-  const [title, setTitle] = useState('');
-  const [slug, setSlug] = useState('');
-  const [content, setContent] = useState('');
-  const [status, setStatus] = useState<PageStatus>('published');
-  const [seoTitle, setSeoTitle] = useState('');
-  const [metaDescription, setMetaDescription] = useState('');
-  const [featuredImage, setFeaturedImage] = useState('');
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -55,314 +50,287 @@ export const PagesManager: React.FC<PagesManagerProps> = ({
     try {
       const res = await fetch('/api/pages');
       const data = await parseApiResponse<any>(res);
-      setPages(Array.isArray(data) ? data : data.pages || []);
-    } catch (err) {
-      console.error(err);
+      const fetched = Array.isArray(data) ? data : data.pages || [];
+      setPages(fetched);
+    } catch (err: any) {
+      console.error('Error fetching pages:', err);
+      setErrorMsg(err.message || 'Failed to fetch pages from database');
     } finally {
       setLoading(false);
     }
   };
 
   const startCreate = () => {
-    setEditingPage(null);
-    setTitle('');
-    setSlug('');
-    setContent('');
-    setStatus('published');
-    setSeoTitle('');
-    setMetaDescription('');
-    setFeaturedImage('');
-    setErrorMsg('');
-    setSuccessMsg('');
-    setViewMode('edit');
+    window.location.href = '/admin/pages/new';
   };
 
   const startEdit = (page: Page) => {
-    setEditingPage(page);
-    setTitle(page.title);
-    setSlug(page.slug);
-    setContent(page.content || '');
-    setStatus(page.status);
-    setSeoTitle(page.seoTitle || '');
-    setMetaDescription(page.metaDescription || '');
-    setFeaturedImage(page.featuredImage || '');
-    setErrorMsg('');
-    setSuccessMsg('');
-    setViewMode('edit');
+    window.location.href = `/admin/pages/${page.id}/edit`;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title.trim() || !slug.trim()) {
-      setErrorMsg('Title and slug are required');
-      return;
-    }
-
-    setIsSubmitting(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-
-    try {
-      const url = editingPage ? `/api/pages/${editingPage.id}` : '/api/pages';
-      const method = editingPage ? 'PUT' : 'POST';
-
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          slug,
-          content,
-          status,
-          seoTitle,
-          metaDescription,
-          featuredImage,
-        }),
-      });
-
-      await parseApiResponse<any>(res);
-
-      setSuccessMsg(editingPage ? 'Page updated successfully!' : 'Page created successfully!');
-      fetchPages();
-      onPagesUpdated();
-      setTimeout(() => setViewMode('all'), 600);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Error saving page');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleDelete = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this static page?')) return;
+  const handleDelete = async (id: string, pageTitle: string) => {
+    if (!confirm(`Are you sure you want to move "${pageTitle}" to trash?`)) return;
     try {
       const res = await fetch(`/api/pages/${id}`, { method: 'DELETE' });
       await parseApiResponse<any>(res);
+      setSuccessMsg(`Page "${pageTitle}" removed successfully.`);
       fetchPages();
       onPagesUpdated();
     } catch (err: any) {
-      alert(err.message || 'Delete error');
+      setErrorMsg(err.message || 'Delete error');
     }
   };
 
-  const filteredPages = pages.filter(
-    (p) =>
-      p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      p.slug.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredPages = useMemo(() => {
+    return pages.filter((p) => {
+      const matchesSearch =
+        p.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.slug.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [pages, searchTerm, statusFilter]);
+
+  const publishedCount = useMemo(() => pages.filter((p) => p.status === 'published').length, [pages]);
+  const draftCount = useMemo(() => pages.filter((p) => p.status === 'draft').length, [pages]);
 
   return (
-    <div className="space-y-6">
-      {/* Top action bar */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-stone-900 border border-stone-800 p-4 rounded-xl">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setViewMode('all')}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-              viewMode === 'all' ? 'bg-amber-400 text-stone-950 shadow-sm' : 'bg-stone-950 text-stone-400 hover:text-white'
-            }`}
-          >
-            <FileCode className="w-3.5 h-3.5" /> All Static Pages ({pages.length})
-          </button>
-          <button
-            onClick={startCreate}
-            className={`px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 ${
-              viewMode === 'edit' && !editingPage ? 'bg-amber-400 text-stone-950 shadow-sm' : 'bg-stone-950 text-stone-400 hover:text-white'
-            }`}
-          >
-            <Plus className="w-3.5 h-3.5" /> Add New Page
-          </button>
+    <div className="space-y-6 font-sans">
+      {/* Top Action & Navigation Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white border border-stone-200 p-4 rounded-xl shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <span className="px-3.5 py-2 rounded-lg text-xs font-bold bg-pink-600 text-white shadow-xs flex items-center gap-1.5">
+              <FileCode className="w-3.5 h-3.5" /> All Static Pages ({pages.length})
+            </span>
+            <button
+              id="admin-pages-add-new-btn"
+              type="button"
+              onClick={startCreate}
+              className="px-3.5 py-2 rounded-lg text-xs font-bold transition flex items-center gap-1.5 bg-stone-50 hover:bg-stone-100 text-stone-700 hover:text-stone-900 border border-stone-200"
+            >
+              <Plus className="w-3.5 h-3.5" /> Add New Page
+            </button>
+          </div>
+
+          <div className="hidden md:flex items-center gap-2 text-[11px] font-mono text-stone-400 pl-2 border-l border-stone-200">
+            <span className="text-emerald-700 font-semibold">{publishedCount} published</span>
+            <span>•</span>
+            <span className="text-stone-500 font-semibold">{draftCount} draft</span>
+          </div>
         </div>
 
-        {viewMode === 'all' && (
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="relative min-w-[220px]">
-            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-500" />
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-stone-400" />
             <input
+              id="admin-pages-search-input"
               type="text"
-              placeholder="Search pages..."
+              placeholder="Search pages by title or slug..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-800 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-stone-500 focus:outline-none focus:border-amber-400"
+              className="w-full bg-stone-50 border border-stone-200 rounded-lg pl-8 pr-3 py-1.5 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:border-pink-600 focus:bg-white transition"
             />
           </div>
-        )}
+
+          <select
+            id="admin-pages-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="bg-stone-50 border border-stone-200 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 focus:outline-none focus:border-pink-600 font-medium"
+          >
+            <option value="all">All Statuses</option>
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+            <option value="trash">Trash</option>
+          </select>
+
+          <button
+            id="admin-pages-refresh-btn"
+            onClick={fetchPages}
+            className="p-2 text-stone-500 hover:text-stone-900 bg-stone-50 hover:bg-stone-100 border border-stone-200 rounded-lg transition"
+            title="Refresh Pages Data"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-pink-600' : ''}`} />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
       {errorMsg && (
-        <div className="p-4 bg-rose-950/60 border border-rose-800 rounded-xl text-rose-200 text-xs flex items-center justify-between">
+        <div className="p-4 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 text-rose-400" />
-            <span>{errorMsg}</span>
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+            <span className="font-medium">{errorMsg}</span>
           </div>
-          <button onClick={() => setErrorMsg('')}><X className="w-4 h-4" /></button>
+          <button onClick={() => setErrorMsg('')} className="text-rose-400 hover:text-rose-700">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
       {successMsg && (
-        <div className="p-4 bg-emerald-950/60 border border-emerald-800 rounded-xl text-emerald-200 text-xs flex items-center justify-between">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-800 text-xs flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            <span>{successMsg}</span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+            <span className="font-medium">{successMsg}</span>
           </div>
-          <button onClick={() => setSuccessMsg('')}><X className="w-4 h-4" /></button>
+          <button onClick={() => setSuccessMsg('')} className="text-emerald-400 hover:text-emerald-700">
+            <X className="w-4 h-4" />
+          </button>
         </div>
       )}
 
-      {/* Table view */}
-      {viewMode === 'all' && (
-        <div className="bg-stone-900 border border-stone-800 rounded-xl overflow-hidden shadow-lg">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm text-stone-300">
-              <thead className="bg-stone-950 text-stone-400 text-xs uppercase font-mono border-b border-stone-800">
+      {/* VIEW: All Pages Table */}
+      <div className="bg-white border border-stone-200 rounded-xl overflow-hidden shadow-xs">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm text-stone-700">
+            <thead className="bg-stone-50 text-stone-600 text-xs uppercase font-mono border-b border-stone-200">
+              <tr>
+                <th className="p-4">Page Title & Slug</th>
+                <th className="p-4">Route / Path</th>
+                <th className="p-4">Author</th>
+                <th className="p-4">Status</th>
+                <th className="p-4">Last Updated</th>
+                <th className="p-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-stone-100">
+              {filteredPages.length === 0 ? (
                 <tr>
-                  <th className="p-4">Page Title & Slug</th>
-                  <th className="p-4">Status</th>
-                  <th className="p-4">Last Updated</th>
-                  <th className="p-4 text-right">Actions</th>
+                  <td colSpan={6} className="p-12 text-center text-stone-500">
+                    <div className="max-w-sm mx-auto space-y-3">
+                      <FileCode className="w-8 h-8 text-stone-300 mx-auto" />
+                      <div className="font-serif font-bold text-stone-800 text-base">
+                        {loading ? 'Loading Pages...' : 'No Static Pages Found'}
+                      </div>
+                      <p className="text-xs text-stone-500">
+                        {searchTerm
+                          ? `No pages matched "${searchTerm}". Try another search keyword.`
+                          : 'No static CMS pages are currently present. Click "Add New Page" to publish one.'}
+                      </p>
+                      {!searchTerm && (
+                        <button
+                          onClick={startCreate}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-pink-600 hover:bg-pink-500 text-white rounded-lg text-xs font-bold transition shadow-xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" /> Create First Page
+                        </button>
+                      )}
+                    </div>
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-stone-800">
-                {filteredPages.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="p-8 text-center text-stone-500 text-xs">
-                      {loading ? 'Loading pages...' : 'No static pages found.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredPages.map((page) => (
-                    <tr key={page.id} className="hover:bg-stone-850/50 transition">
-                      <td className="p-4">
-                        <div className="font-serif font-bold text-white cursor-pointer hover:text-amber-400" onClick={() => startEdit(page)}>
-                          {page.title}
+              ) : (
+                filteredPages.map((page) => {
+                  const isPrivacy = page.slug === 'privacy-policy' || page.slug === 'privacy';
+                  const publicUrl = isPrivacy ? '/privacy-policy' : `/page/${page.slug}`;
+
+                  return (
+                    <tr key={page.id} className="hover:bg-stone-50/80 transition group">
+                      <td className="p-4 max-w-md">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 border ${
+                              isPrivacy
+                                ? 'bg-pink-50 text-pink-600 border-pink-200'
+                                : 'bg-stone-100 text-stone-600 border-stone-200'
+                            }`}
+                          >
+                            <FileCode className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <div
+                              onClick={() => startEdit(page)}
+                              className="font-serif font-bold text-stone-900 group-hover:text-pink-600 transition cursor-pointer flex items-center gap-1.5"
+                            >
+                              <span>{page.title}</span>
+                              {isPrivacy && (
+                                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-pink-100 text-pink-700 border border-pink-200">
+                                  System Page
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] font-mono text-stone-400 truncate mt-0.5">
+                              /{page.slug}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-[11px] font-mono text-stone-500">/{page.slug}</div>
                       </td>
+
                       <td className="p-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold font-mono ${
-                          page.status === 'published'
-                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                            : 'bg-stone-500/10 text-stone-400 border border-stone-500/20'
-                        }`}>
+                        <a
+                          href={publicUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-mono text-stone-500 hover:text-pink-600 transition bg-stone-100 hover:bg-pink-50 px-2 py-1 rounded"
+                        >
+                          <span>{publicUrl}</span>
+                          <ExternalLink className="w-3 h-3 shrink-0" />
+                        </a>
+                      </td>
+
+                      <td className="p-4 text-xs font-medium text-stone-600">
+                        {page.authorName || 'Editorial Staff'}
+                      </td>
+
+                      <td className="p-4">
+                        <span
+                          className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                            page.status === 'published'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : page.status === 'draft'
+                              ? 'bg-stone-100 text-stone-600 border-stone-200'
+                              : 'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}
+                        >
                           {page.status}
                         </span>
                       </td>
+
                       <td className="p-4 text-xs text-stone-500 font-mono">
-                        {new Date(page.updatedAt || page.createdAt).toLocaleDateString()}
+                        {new Date(page.updatedAt || page.createdAt).toLocaleDateString(undefined, {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })}
                       </td>
-                      <td className="p-4 text-right space-x-1">
-                        <button
-                          onClick={() => startEdit(page)}
-                          className="p-1.5 bg-stone-800 hover:bg-amber-400 hover:text-stone-950 rounded text-stone-300 transition"
-                          title="Edit"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(page.id)}
-                          className="p-1.5 bg-stone-800 hover:bg-rose-600 hover:text-white rounded text-stone-400 transition"
-                          title="Delete"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
+
+                      <td className="p-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          <a
+                            href={publicUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="p-1.5 text-stone-400 hover:text-stone-900 hover:bg-stone-100 rounded-lg transition"
+                            title="View Public Page"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </a>
+                          <button
+                            id={`admin-edit-page-${page.id}`}
+                            onClick={() => startEdit(page)}
+                            className="p-1.5 text-stone-400 hover:text-pink-600 hover:bg-pink-50 rounded-lg transition"
+                            title="Edit Page in Dedicated Editor"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            id={`admin-delete-page-${page.id}`}
+                            onClick={() => handleDelete(page.id, page.title)}
+                            className="p-1.5 text-stone-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            title="Move to Trash"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
         </div>
-      )}
-
-      {/* Edit Form */}
-      {viewMode === 'edit' && (
-        <form onSubmit={handleSubmit} className="bg-stone-900 border border-stone-800 rounded-xl p-6 space-y-6">
-          <div className="flex items-center justify-between border-b border-stone-800 pb-4">
-            <h3 className="font-serif font-bold text-white text-lg">
-              {editingPage ? 'Edit Static Page' : 'Create Static Page'}
-            </h3>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setViewMode('all')}
-                className="px-3 py-1.5 bg-stone-800 hover:bg-stone-700 text-stone-300 rounded-lg text-xs font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-4 py-1.5 bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold rounded-lg text-xs transition flex items-center gap-1.5"
-              >
-                {isSubmitting ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
-                Save Page
-              </button>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Page Title *</label>
-              <input
-                type="text"
-                required
-                value={title}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (!editingPage) {
-                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-'));
-                  }
-                }}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400 font-serif font-bold"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">URL Slug *</label>
-              <input
-                type="text"
-                required
-                value={slug}
-                onChange={(e) => setSlug(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-amber-400 font-mono focus:outline-none focus:border-amber-400"
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Content (Markdown / HTML)</label>
-              <textarea
-                rows={10}
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-3 text-xs text-white font-sans focus:outline-none focus:border-amber-400"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Status</label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value as PageStatus)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-              >
-                <option value="published">Published</option>
-                <option value="draft">Draft</option>
-                <option value="trash">Trash</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-xs font-mono uppercase text-stone-400 mb-1">Featured Image URL</label>
-              <input
-                type="text"
-                value={featuredImage}
-                onChange={(e) => setFeaturedImage(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-800 rounded-lg p-2.5 text-xs text-white focus:outline-none focus:border-amber-400"
-              />
-            </div>
-          </div>
-        </form>
-      )}
+      </div>
     </div>
   );
 };

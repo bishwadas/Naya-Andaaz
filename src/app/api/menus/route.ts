@@ -20,10 +20,12 @@ export async function PUT(req: NextRequest) {
     if (!auth.authorized) {
       return NextResponse.json({ error: 'Editor access required' }, { status: 403 });
     }
-    const { id, items } = await req.json();
-    const updated = await updateMenu(id, items);
-    return NextResponse.json(updated);
+    const { id, location, items } = await req.json();
+    const menuIdOrLoc = id || location || 'primary';
+    await updateMenu(menuIdOrLoc, items || []);
+    return NextResponse.json({ success: true });
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Error updating menu:', error);
+    return NextResponse.json({ error: error.message || 'Unable to update menu' }, { status: 500 });
   }
 }

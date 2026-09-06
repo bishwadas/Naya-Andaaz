@@ -1,9 +1,15 @@
 /**
- * Registration email verification is enabled by default for safety.
- * Set EMAIL_VERIFICATION_ENABLED=false for local development when a custom
- * sending domain is not available. Verification routes remain available so
- * the feature can be enabled again without a code change.
+ * Registration & Sign-In email verification toggle.
+ *
+ * EMAIL_VERIFICATION_ENABLED:
+ * Set to `true` to enforce 6-digit OTP verification via Brevo.
+ * Set to `false` to temporarily pause OTP email verification.
+ */
+export const EMAIL_VERIFICATION_ENABLED: boolean = true;
+
+/**
+ * Helper to check whether email OTP verification is currently active.
  */
 export function isEmailVerificationEnabled(): boolean {
-  return process.env.EMAIL_VERIFICATION_ENABLED !== 'false';
+  return EMAIL_VERIFICATION_ENABLED;
 }

@@ -6,7 +6,7 @@ import { Mail, AlertCircle, CheckCircle2, Loader2, RefreshCw } from 'lucide-reac
 
 interface OtpVerificationProps {
   email: string;
-  purpose: 'signup' | 'reset_password';
+  purpose: 'signup' | 'signin' | 'reset_password';
   onSuccess: (data?: { resetToken?: string }) => void;
   onBackToRequest?: () => void;
 }
@@ -147,7 +147,7 @@ export function OtpVerification({
         setSuccess(res.message || 'Verification successful!');
         setTimeout(() => {
           onSuccess({ resetToken: res.resetToken });
-        }, 1500);
+        }, 1200);
       } else {
         setError(res.error || 'Invalid verification code.');
         if (res.expired || res.maxAttemptsReached) {
@@ -174,7 +174,7 @@ export function OtpVerification({
       const res = await resendOtp(email, purpose);
 
       if (res.success) {
-        setSuccess('A new 6-digit code has been dispatched.');
+        setSuccess('A new 6-digit code has been sent.');
         setOtpValues(Array(6).fill(''));
         setExpirySeconds(600); // reset 10-minute expiry
         setCooldownSeconds(60); // reset 60-second cooldown
@@ -195,28 +195,28 @@ export function OtpVerification({
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
-        <div className="mx-auto w-12 h-12 bg-amber-400/10 border border-amber-400/30 rounded-2xl flex items-center justify-center text-amber-400">
+        <div className="mx-auto w-12 h-12 bg-pink-50 border border-pink-100 rounded-2xl flex items-center justify-center text-pink-600 shadow-sm">
           <Mail className="w-6 h-6" />
         </div>
-        <h3 className="text-xl font-serif font-bold text-stone-100">
-          Enter Verification Code
+        <h3 className="text-xl font-bold text-stone-900 tracking-tight">
+          Enter 6-Digit Code
         </h3>
-        <p className="text-xs sm:text-sm text-stone-400 leading-relaxed max-w-sm mx-auto">
-          We sent a secure 6-digit OTP code to <br />
-          <strong className="text-amber-400 font-mono tracking-wide">{email}</strong>
+        <p className="text-sm text-stone-500 leading-relaxed max-w-sm mx-auto">
+          We sent a verification code to <br />
+          <strong className="text-stone-900 font-semibold">{email}</strong>
         </p>
       </div>
 
       {error && (
-        <div className="p-4 rounded-xl bg-rose-950/60 border border-rose-800/60 text-rose-300 text-xs sm:text-sm flex items-start gap-3">
-          <AlertCircle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-red-700 text-sm flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
           <span className="leading-relaxed">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="p-4 rounded-xl bg-emerald-950/60 border border-emerald-800/60 text-emerald-300 text-xs sm:text-sm flex items-start gap-3">
-          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+        <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-sm flex items-start gap-3">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
           <span className="leading-relaxed">{success}</span>
         </div>
       )}
@@ -238,7 +238,7 @@ export function OtpVerification({
             onKeyDown={(e) => handleKeyDown(index, e)}
             onPaste={index === 0 ? handlePaste : undefined}
             disabled={isVerifying || expirySeconds <= 0}
-            className="w-12 h-14 sm:w-14 sm:h-16 bg-stone-950 border border-stone-800 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 text-center font-mono font-bold text-2xl text-amber-400 rounded-xl transition-all duration-150 focus:outline-none disabled:opacity-50"
+            className="w-11 h-14 sm:w-13 sm:h-16 bg-white border-2 border-stone-200 focus:border-pink-600 focus:ring-4 focus:ring-pink-100 text-center font-mono font-bold text-2xl text-stone-900 rounded-xl transition-all duration-150 focus:outline-none disabled:opacity-50 disabled:bg-stone-50"
           />
         ))}
       </div>
@@ -247,26 +247,26 @@ export function OtpVerification({
       <div className="flex items-center justify-between text-xs text-stone-500 font-mono px-1">
         <div>
           {expirySeconds > 0 ? (
-            <span className="text-stone-400">
-              Code expires in:{' '}
-              <strong className="text-amber-500 font-bold">
+            <span className="text-stone-500">
+              Expires in:{' '}
+              <strong className="text-pink-600 font-bold">
                 {formatTime(expirySeconds)}
               </strong>
             </span>
           ) : (
-            <span className="text-rose-400 font-bold">Code expired</span>
+            <span className="text-red-600 font-bold">Code expired</span>
           )}
         </div>
 
         <div>
           {cooldownSeconds > 0 ? (
-            <span>Resend code in {cooldownSeconds}s</span>
+            <span className="text-stone-400">Resend in {cooldownSeconds}s</span>
           ) : (
             <button
               type="button"
               onClick={handleResendCode}
               disabled={isResending}
-              className="text-amber-400 hover:text-amber-300 font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+              className="text-pink-600 hover:text-pink-700 font-bold transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
             >
               {isResending ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -285,7 +285,7 @@ export function OtpVerification({
           type="button"
           onClick={handleVerify}
           disabled={isVerifying || otpValues.join('').length !== 6 || expirySeconds <= 0}
-          className="w-full bg-amber-400 hover:bg-amber-300 text-stone-950 font-bold py-3 px-4 rounded-xl text-sm transition duration-150 flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+          className="w-full bg-pink-600 hover:bg-pink-700 text-white font-bold py-3 px-4 rounded-xl text-sm transition duration-150 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
         >
           {isVerifying ? (
             <>
@@ -293,7 +293,7 @@ export function OtpVerification({
               <span>Verifying code...</span>
             </>
           ) : (
-            <span>Verify & Confirm</span>
+            <span>Verify & Continue</span>
           )}
         </button>
       </div>
@@ -303,7 +303,7 @@ export function OtpVerification({
           <button
             type="button"
             onClick={onBackToRequest}
-            className="text-stone-400 hover:text-stone-300 text-xs font-semibold underline cursor-pointer"
+            className="text-stone-500 hover:text-stone-700 text-xs font-medium underline cursor-pointer"
           >
             Use a different email address
           </button>

@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
-    let systemInstruction = 'You are an expert editorial AI writing assistant for Sereia, an elite digital magazine and news portal. Return concise, high-impact journalism content.';
+    let systemInstruction = 'You are an expert editorial AI writing assistant for Naya Andaaz, an inspiring digital lifestyle magazine and news portal. Return concise, high-impact journalism content.';
     let userPrompt = prompt || '';
 
     if (action === 'generate_title') {

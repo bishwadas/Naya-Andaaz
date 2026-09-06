@@ -77,7 +77,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   settings,
   primaryMenuItems: initialPrimaryItems,
 }) => {
-  const { currentUser, isAuthenticated, logout } = useAuth();
+  const { currentUser, isAuthenticated, logout, isLoggingOut } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -97,8 +97,41 @@ export const Navbar: React.FC<NavbarProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({});
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [avatarImgError, setAvatarImgError] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
   const [trendingSubcatsMap, setTrendingSubcatsMap] = useState<Record<string, Category[]>>({});
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Reset avatar image error when currentUser or avatar changes
+  useEffect(() => {
+    setAvatarImgError(false);
+  }, [currentUser?.avatar, currentUser?.id]);
+
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    };
+
+    if (userDropdownOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener('touchstart', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [userDropdownOpen]);
+
+  // Compute user initial letter (e.g. "Bishwa Das" -> "B")
+  const userInitial = React.useMemo(() => {
+    if (!currentUser) return 'U';
+    const nameStr = currentUser.name || currentUser.username || currentUser.email || 'U';
+    const trimmed = String(nameStr).trim();
+    return trimmed.charAt(0).toUpperCase() || 'U';
+  }, [currentUser]);
 
   // Fetch top 5 trending subcategories dynamically from DB endpoint
   useEffect(() => {
@@ -209,6 +242,22 @@ export const Navbar: React.FC<NavbarProps> = ({
     }
   }, [searchOpen]);
 
+  // Dynamically update site favicon if configured in settings
+  useEffect(() => {
+    if (settings?.favicon) {
+      const existingFavicon = document.querySelector<HTMLLinkElement>("link[rel*='icon']");
+      if (existingFavicon) {
+        existingFavicon.href = settings.favicon;
+      } else {
+        const link = document.createElement('link');
+        link.type = 'image/x-icon';
+        link.rel = 'shortcut icon';
+        link.href = settings.favicon;
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+    }
+  }, [settings?.favicon]);
+
   // Handle Search Submission
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -237,12 +286,26 @@ export const Navbar: React.FC<NavbarProps> = ({
           { id: 'def_style', label: 'Style', url: '/style' },
           { id: 'def_well', label: 'Wellness', url: '/wellness' },
           { id: 'def_travel', label: 'Travel', url: '/travel' },
-          { id: 'def_food', label: 'Food & Wine', url: '/food' },
+          { id: 'def_food', label: 'Food & Wine', url: '/food-wine' },
           { id: 'def_career', label: 'Career & Finance', url: '/career-finance' },
-          { id: 'def_rel', label: 'Relationships', url: '/relationships' },
+          { id: 'def_rel', label: 'Relationship', url: '/relationship' },
         ];
 
   const getNavItemUrl = (item: Pick<MenuItem, 'url' | 'categorySlug'>) => {
+    const rawCatSlug = (item.categorySlug || '').toLowerCase().trim();
+    const isFood =
+      rawCatSlug === 'food' ||
+      rawCatSlug === 'food-wine' ||
+      item.url === '/food' ||
+      item.url === '/food-wine';
+    if (isFood) return '/food-wine';
+
+    const isRel =
+      rawCatSlug === 'relationships' ||
+      rawCatSlug === 'relationship' ||
+      item.url === '/relationships';
+    if (isRel) return '/relationship';
+
     const linkedCategory = item.categorySlug
       ? categories.find((category) => category.slug.toLowerCase() === item.categorySlug?.toLowerCase())
       : undefined;
@@ -261,9 +324,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       { id: 'cat_style', name: 'Style', slug: 'style' },
       { id: 'cat_wellness', name: 'Wellness', slug: 'wellness' },
       { id: 'cat_travel', name: 'Travel', slug: 'travel' },
-      { id: 'cat_food', name: 'Food & Wine', slug: 'food' },
+      { id: 'cat_food', name: 'Food & Wine', slug: 'food-wine' },
       { id: 'cat_career', name: 'Career & Finance', slug: 'career-finance' },
-      { id: 'cat_relationships', name: 'Relationships', slug: 'relationships' },
+      { id: 'cat_relationship', name: 'Relationship', slug: 'relationship' },
     ] as Category[];
   }, [categories]);
 
@@ -276,7 +339,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         id="top-time-bar"
         className="fixed top-0 left-0 right-0 z-50 h-8 bg-black text-white border-b border-stone-900 flex items-center justify-between px-3 sm:px-6 select-none"
       >
-        <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
+        <div className="max-w-[1440px] mx-auto w-full flex items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="text-[11px] sm:text-xs font-medium tracking-tight text-stone-200 flex items-center gap-2">
             <Calendar className="w-3.5 h-3.5 text-pink-500 shrink-0" />
             <span suppressHydrationWarning>{timeString}</span>
@@ -313,7 +376,7 @@ export const Navbar: React.FC<NavbarProps> = ({
         }`}
       >
         {/* Main Header Bar */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 sm:h-20 flex items-center justify-between relative">
+        <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between relative">
           {/* Left Side: Desktop Menu Button / Mobile Brand */}
           <div className="flex items-center gap-3">
             {/* Desktop [ = Menu ] Outline Pill Button */}
@@ -330,109 +393,262 @@ export const Navbar: React.FC<NavbarProps> = ({
             {/* Mobile Brand (Left on mobile) */}
             <div className="md:hidden flex items-center">
               <Link href="/" className="group flex items-center">
-                <span className="font-serif text-2xl font-black tracking-[0.12em] text-[#db2777] uppercase">
-                  {settings?.siteTitle || 'SEREIA'}
-                </span>
+                {(settings?.logoMobile || settings?.logoPrimary || settings?.logo) ? (
+                  <img
+                    src={settings.logoMobile || settings.logoPrimary || settings.logo}
+                    alt={settings?.siteTitle || settings?.siteName || 'Naya Andaaz'}
+                    width={160}
+                    height={36}
+                    loading="eager"
+                    decoding="async"
+                    className="h-auto max-h-9 w-auto max-w-[160px] object-contain"
+                  />
+                ) : (
+                  <span className="font-serif text-2xl font-black tracking-[0.12em] text-[#db2777] uppercase">
+                    {settings?.siteTitle || settings?.siteName || 'NAYA ANDAAZ'}
+                  </span>
+                )}
               </Link>
             </div>
           </div>
 
           {/* Center: Brand Logo (Desktop Center) */}
           <div className="hidden md:flex absolute left-1/2 -translate-x-1/2 items-center justify-center">
-            <Link href="/" className="group flex items-center" id="header-brand-logo">
-              <span className="font-serif text-3xl sm:text-4xl lg:text-[40px] font-black tracking-[0.16em] text-[#db2777] hover:opacity-90 transition uppercase">
-                {settings?.siteTitle || 'SEREIA'}
-              </span>
-            </Link>
+            {pathname === '/' ? (
+              <h1 className="m-0 p-0 text-[0px] leading-none inline-flex items-center">
+                <span className="sr-only">Naya Andaaz</span>
+                <Link href="/" className="group flex items-center" id="header-brand-logo">
+                  {(settings?.logoPrimary || settings?.logo) ? (
+                    <img
+                      src={settings.logoPrimary || settings.logo}
+                      alt={settings?.siteTitle || settings?.siteName || 'Naya Andaaz'}
+                      width={280}
+                      height={64}
+                      loading="eager"
+                      decoding="async"
+                      className="h-auto max-h-12 sm:max-h-14 lg:max-h-16 w-auto max-w-[280px] object-contain hover:opacity-95 transition"
+                    />
+                  ) : (
+                    <span className="font-serif text-3xl sm:text-4xl lg:text-[40px] font-black tracking-[0.16em] text-[#db2777] hover:opacity-90 transition uppercase">
+                      {settings?.siteTitle || settings?.siteName || 'NAYA ANDAAZ'}
+                    </span>
+                  )}
+                </Link>
+              </h1>
+            ) : (
+              <Link href="/" className="group flex items-center" id="header-brand-logo">
+                {(settings?.logoPrimary || settings?.logo) ? (
+                  <img
+                    src={settings.logoPrimary || settings.logo}
+                    alt={settings?.siteTitle || settings?.siteName || 'Naya Andaaz'}
+                    width={280}
+                    height={64}
+                    loading="eager"
+                    decoding="async"
+                    className="h-auto max-h-12 sm:max-h-14 lg:max-h-16 w-auto max-w-[280px] object-contain hover:opacity-95 transition"
+                  />
+                ) : (
+                  <span className="font-serif text-3xl sm:text-4xl lg:text-[40px] font-black tracking-[0.16em] text-[#db2777] hover:opacity-90 transition uppercase">
+                    {settings?.siteTitle || settings?.siteName || 'NAYA ANDAAZ'}
+                  </span>
+                )}
+              </Link>
+            )}
           </div>
 
-          {/* Right Side: Sign In & Search */}
+          {/* Right Side: Logged In Avatar / Sign In & Search & Mobile Menu */}
           <div className="flex items-center gap-2 sm:gap-2.5">
-            {/* Desktop Auth Button */}
-            <div className="relative">
+            {/* User Auth Controls (Desktop Pill & Mobile Avatar) */}
+            <div className="relative" ref={userMenuRef}>
               {isAuthenticated && currentUser ? (
-                <div className="relative">
+                <>
+                  {/* Mobile Avatar Button (Visible only on mobile / md:hidden) */}
+                  <button
+                    id="mobile-user-avatar-btn"
+                    onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+                    className="md:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full overflow-hidden flex items-center justify-center cursor-pointer transition active:scale-95 shadow-2xs border border-transparent hover:opacity-95 focus:outline-none select-none"
+                    aria-label="User Profile"
+                  >
+                    {currentUser.avatar && !avatarImgError ? (
+                      <img
+                        src={currentUser.avatar}
+                        alt={currentUser.name || 'User Avatar'}
+                        onError={() => setAvatarImgError(true)}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-[#EC008C] text-white font-bold text-base flex items-center justify-center select-none shadow-inner">
+                        {userInitial}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Desktop User Menu Pill (Visible only on desktop / md:inline-flex) */}
                   <button
                     onClick={() => setUserDropdownOpen(!userDropdownOpen)}
                     id="desktop-user-menu-btn"
-                    className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 text-xs sm:text-[13.5px] font-bold tracking-tight transition cursor-pointer active:scale-95 shadow-2xs"
+                    className="hidden md:inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 text-xs sm:text-[13.5px] font-bold tracking-tight transition cursor-pointer active:scale-95 shadow-2xs"
                   >
-                    <UserIcon className="w-3.5 h-3.5 text-pink-600" strokeWidth={2.2} />
-                    <span className="hidden sm:inline max-w-[90px] truncate">{currentUser.name}</span>
-                    <ChevronDown className="w-3 h-3 text-pink-600 hidden sm:inline" />
+                    {/* Desktop Avatar Icon / Initial */}
+                    <div className="w-6 h-6 rounded-full overflow-hidden flex items-center justify-center shrink-0">
+                      {currentUser.avatar && !avatarImgError ? (
+                        <img
+                          src={currentUser.avatar}
+                          alt={currentUser.name || 'Avatar'}
+                          onError={() => setAvatarImgError(true)}
+                          className="w-full h-full object-cover rounded-full"
+                        />
+                      ) : (
+                        <div className="w-full h-full rounded-full bg-[#EC008C] text-white font-bold text-[11px] flex items-center justify-center">
+                          {userInitial}
+                        </div>
+                      )}
+                    </div>
+                    <span className="max-w-[120px] truncate font-bold text-pink-600">{currentUser.name}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-pink-600 shrink-0" strokeWidth={2.2} />
                   </button>
 
-                  {/* Logged in dropdown */}
+                  {/* Shared Profile Dropdown (Mobile + Desktop) */}
                   {userDropdownOpen && (
                     <div
                       id="user-profile-dropdown"
-                      className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-xl shadow-xl py-2 z-50 text-xs text-stone-800"
+                      className="absolute right-0 mt-2 w-56 bg-white border border-stone-200 rounded-xl shadow-xl py-2 z-50 text-xs text-stone-800 animate-in fade-in zoom-in-95 duration-150"
                     >
                       <div className="px-4 py-2 border-b border-stone-100">
-                        <p className="font-bold text-stone-950 truncate">{currentUser.name}</p>
-                        <p className="text-[11px] text-stone-500 truncate">{currentUser.email}</p>
-                        <span className="inline-block mt-1 font-mono text-[9px] uppercase tracking-wider bg-pink-100 text-pink-800 px-1.5 py-0.5 rounded font-bold">
+                        <div className="flex items-center gap-2.5 mb-1">
+                          <div className="w-7 h-7 rounded-full overflow-hidden shrink-0 flex items-center justify-center">
+                            {currentUser.avatar && !avatarImgError ? (
+                              <img
+                                src={currentUser.avatar}
+                                alt={currentUser.name}
+                                className="w-full h-full object-cover rounded-full"
+                              />
+                            ) : (
+                              <div className="w-full h-full rounded-full bg-[#EC008C] text-white font-bold text-xs flex items-center justify-center">
+                                {userInitial}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-bold text-stone-950 truncate">{currentUser.name}</p>
+                            <p className="text-[11px] text-stone-500 truncate">{currentUser.email}</p>
+                          </div>
+                        </div>
+                        <span className="inline-block font-mono text-[9px] uppercase tracking-wider bg-pink-100 text-pink-800 px-1.5 py-0.5 rounded font-bold">
                           {currentUser.role}
                         </span>
                       </div>
 
-                      {(currentUser.role?.toUpperCase() === 'ADMIN' ||
-                        currentUser.role?.toUpperCase() === 'EDITOR' ||
-                        currentUser.role?.toUpperCase() === 'AUTHOR') && (
+                      {/* Role-Specific Dashboard Links */}
+                      {currentUser.role?.toUpperCase() === 'ADMIN' && (
                         <Link
                           href="/admin"
                           onClick={() => setUserDropdownOpen(false)}
                           className="flex items-center gap-2 px-4 py-2.5 text-stone-800 hover:bg-pink-50 hover:text-pink-600 font-semibold"
                         >
                           <Shield className="w-3.5 h-3.5 text-pink-500" />
-                          Admin CMS Dashboard
+                          Admin Dashboard
                         </Link>
                       )}
 
+                      {currentUser.role?.toUpperCase() === 'EDITOR' && (
+                        <Link
+                          href="/editor"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-stone-800 hover:bg-pink-50 hover:text-pink-600 font-semibold"
+                        >
+                          <Shield className="w-3.5 h-3.5 text-purple-500" />
+                          Editorial Desk
+                        </Link>
+                      )}
+
+                      {currentUser.role?.toUpperCase() === 'AUTHOR' && (
+                        <Link
+                          href="/author"
+                          onClick={() => setUserDropdownOpen(false)}
+                          className="flex items-center gap-2 px-4 py-2.5 text-stone-800 hover:bg-pink-50 hover:text-pink-600 font-semibold"
+                        >
+                          <Shield className="w-3.5 h-3.5 text-pink-500" />
+                          Author Dashboard
+                        </Link>
+                      )}
+
+                      <Link
+                        href="/account/profile"
+                        onClick={() => setUserDropdownOpen(false)}
+                        className="flex items-center gap-2 px-4 py-2.5 text-stone-800 hover:bg-pink-50 hover:text-pink-600 font-semibold"
+                      >
+                        <UserIcon className="w-3.5 h-3.5 text-stone-500" />
+                        My Account Profile
+                      </Link>
+
                       <button
                         onClick={() => {
-                          logout();
                           setUserDropdownOpen(false);
+                          logout('/login');
                         }}
-                        className="w-full flex items-center gap-2 px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-left font-semibold cursor-pointer"
+                        disabled={isLoggingOut}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 text-rose-600 hover:bg-rose-50 text-left font-semibold cursor-pointer disabled:opacity-50"
                       >
                         <LogOut className="w-3.5 h-3.5" />
-                        Sign Out
+                        {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                       </button>
                     </div>
                   )}
-                </div>
+                </>
               ) : (
-                <Link
-                  href="/sign-in"
-                  id="desktop-signin-btn"
-                  className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 text-xs sm:text-[13.5px] font-bold tracking-tight transition cursor-pointer active:scale-95 shadow-2xs"
-                >
-                  <UserIcon className="w-3.5 h-3.5 text-pink-600" strokeWidth={2.2} />
-                  <span>Sign In</span>
-                </Link>
+                <>
+                  {/* Desktop Sign In Button */}
+                  <Link
+                    href="/sign-in"
+                    id="desktop-signin-btn"
+                    className="hidden md:inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 text-xs sm:text-[13.5px] font-bold tracking-tight transition cursor-pointer active:scale-95 shadow-2xs"
+                  >
+                    <UserIcon className="w-3.5 h-3.5 text-pink-600" strokeWidth={2.2} />
+                    <span>Sign In</span>
+                  </Link>
+
+                  {/* Mobile Sign In Icon Button */}
+                  <Link
+                    href="/sign-in"
+                    id="mobile-signin-btn"
+                    className="md:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+                    aria-label="Sign In"
+                  >
+                    <UserIcon className="w-4 h-4 text-pink-600" strokeWidth={2.2} />
+                  </Link>
+                </>
               )}
             </div>
 
-            {/* Search Pill Button */}
+            {/* Search Button (Desktop Pill, Mobile Circular) */}
             <button
               id="desktop-search-toggle-btn"
               onClick={() => setSearchOpen(!searchOpen)}
-              className="inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 text-xs sm:text-[13.5px] font-bold tracking-tight transition cursor-pointer active:scale-95 shadow-2xs"
+              className="hidden md:inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 text-xs sm:text-[13.5px] font-bold tracking-tight transition cursor-pointer active:scale-95 shadow-2xs"
               aria-label="Toggle Search"
             >
               <Search className="w-3.5 h-3.5 text-pink-600" strokeWidth={2.2} />
-              <span className="hidden sm:inline">Search</span>
+              <span>Search</span>
+            </button>
+
+            <button
+              id="mobile-search-toggle-btn"
+              onClick={() => setSearchOpen(!searchOpen)}
+              className="md:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
+              aria-label="Toggle Search"
+            >
+              <Search className="w-4 h-4 text-pink-600" strokeWidth={2.2} />
             </button>
 
             {/* Mobile Hamburger Menu Toggle */}
             <button
               id="mobile-drawer-toggle-btn"
               onClick={() => setMobileDrawerOpen(true)}
-              className="md:hidden p-1.5 rounded-full border border-pink-500 text-pink-600 hover:bg-pink-50 transition cursor-pointer"
+              className="md:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-full border border-pink-500 hover:border-pink-600 bg-white hover:bg-pink-50 text-pink-600 flex items-center justify-center transition cursor-pointer active:scale-95 shadow-2xs"
               aria-label="Open Mobile Menu"
             >
-              <MenuIcon className="w-4 h-4" />
+              <MenuIcon className="w-4 h-4 text-pink-600" strokeWidth={2.2} />
             </button>
           </div>
         </div>
@@ -482,7 +698,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           aria-label="Primary Navigation"
         >
           {/* Desktop & Mobile Scrollable View */}
-          <div className="max-w-7xl mx-auto px-2 sm:px-4">
+          <div className="max-w-[1440px] mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-start md:justify-center overflow-x-auto no-scrollbar scrollbar-none py-1 gap-1.5 sm:gap-2.5 md:gap-3.5 lg:gap-5 text-stone-900 select-none">
               {navLinks
                 .filter((item) => {
@@ -561,9 +777,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <Link
                   href="/"
                   onClick={() => setMobileDrawerOpen(false)}
-                  className="font-serif text-2xl font-black tracking-[0.12em] text-[#db2777] uppercase"
+                  className="flex items-center"
                 >
-                  {settings?.siteTitle || 'SEREIA'}
+                  {(settings?.logoMobile || settings?.logoPrimary || settings?.logo) ? (
+                    <img
+                      src={settings.logoMobile || settings.logoPrimary || settings.logo}
+                      alt={settings?.siteTitle || settings?.siteName || 'Naya Andaaz'}
+                      className="h-auto max-h-9 w-auto max-w-[170px] object-contain"
+                    />
+                  ) : (
+                    <span className="font-serif text-2xl font-black tracking-[0.12em] text-[#db2777] uppercase">
+                      {settings?.siteTitle || settings?.siteName || 'NAYA ANDAAZ'}
+                    </span>
+                  )}
                 </Link>
                 <button
                   onClick={() => setMobileDrawerOpen(false)}
@@ -719,7 +945,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       onClick={() => setMobileDrawerOpen(false)}
                       className="block py-1 hover:text-stone-950 transition"
                     >
-                      About Sereia
+                      About Naya Andaaz
                     </Link>
                     <Link
                       href="/page/contact-us"
@@ -760,28 +986,59 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </span>
                     </div>
 
-                    {(currentUser.role?.toUpperCase() === 'ADMIN' ||
-                      currentUser.role?.toUpperCase() === 'EDITOR' ||
-                      currentUser.role?.toUpperCase() === 'AUTHOR') && (
+                    {/* Role-Specific Dashboard Link */}
+                    {currentUser.role?.toUpperCase() === 'ADMIN' && (
                       <Link
                         href="/admin"
                         onClick={() => setMobileDrawerOpen(false)}
                         className="w-full flex items-center justify-center gap-2 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg text-xs transition shadow-xs"
                       >
                         <Shield className="w-3.5 h-3.5" />
-                        Admin CMS Dashboard
+                        Admin Dashboard
                       </Link>
                     )}
 
+                    {currentUser.role?.toUpperCase() === 'EDITOR' && (
+                      <Link
+                        href="/editor"
+                        onClick={() => setMobileDrawerOpen(false)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg text-xs transition shadow-xs"
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                        Editorial Desk
+                      </Link>
+                    )}
+
+                    {currentUser.role?.toUpperCase() === 'AUTHOR' && (
+                      <Link
+                        href="/author"
+                        onClick={() => setMobileDrawerOpen(false)}
+                        className="w-full flex items-center justify-center gap-2 py-2.5 bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg text-xs transition shadow-xs"
+                      >
+                        <Shield className="w-3.5 h-3.5" />
+                        Author Dashboard
+                      </Link>
+                    )}
+
+                    <Link
+                      href="/account/profile"
+                      onClick={() => setMobileDrawerOpen(false)}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-stone-100 hover:bg-stone-200 text-stone-800 font-semibold rounded-lg text-xs transition"
+                    >
+                      <UserIcon className="w-3.5 h-3.5 text-stone-600" />
+                      My Account Profile
+                    </Link>
+
                     <button
                       onClick={() => {
-                        logout();
                         setMobileDrawerOpen(false);
+                        logout('/login');
                       }}
-                      className="w-full flex items-center justify-center gap-2 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold rounded-lg text-xs transition cursor-pointer"
+                      disabled={isLoggingOut}
+                      className="w-full flex items-center justify-center gap-2 py-2 bg-stone-200 hover:bg-stone-300 text-stone-800 font-semibold rounded-lg text-xs transition cursor-pointer disabled:opacity-50"
                     >
                       <LogOut className="w-3.5 h-3.5" />
-                      Sign Out
+                      {isLoggingOut ? 'Signing Out...' : 'Sign Out'}
                     </button>
                   </div>
                 ) : (

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { getUserByEmail, verifyUserEmail, setUserPasswordResetToken } from '@/db/repository';
 import { verifyOtpCode } from '@/lib/otp';
+import { createSessionToken, setSessionCookie, sanitizeUser } from '@/lib/auth';
+import { INITIAL_USERS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!purpose || (purpose !== 'signup' && purpose !== 'reset_password')) {
+    if (!purpose || (purpose !== 'signup' && purpose !== 'signin' && purpose !== 'reset_password')) {
       return NextResponse.json(
         { success: false, error: 'Invalid purpose parameter' },
         { status: 400 }
@@ -32,7 +34,14 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    const user = await getUserByEmail(cleanEmail);
+    let user = await getUserByEmail(cleanEmail);
+
+    if (!user) {
+      const match = INITIAL_USERS.find((u) => u.email.toLowerCase() === cleanEmail);
+      if (match) {
+        user = match as any;
+      }
+    }
 
     if (!user) {
       return NextResponse.json(
@@ -41,7 +50,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Call our verifyOtpCode logic
+    if (user.isActive === false) {
+      return NextResponse.json(
+        { success: false, error: 'This account has been deactivated. Please contact support.' },
+        { status: 403 }
+      );
+    }
+
+    // Call verifyOtpCode
     const result = await verifyOtpCode(cleanEmail, otp, purpose);
 
     if (!result.success) {
@@ -58,19 +74,36 @@ export async function POST(req: NextRequest) {
     }
 
     // On successful verification:
-    if (purpose === 'signup') {
-      // Mark user as verified
-      await verifyUserEmail(user.id);
+    if (purpose === 'signup' || purpose === 'signin') {
+      // Mark user as emailVerified if not already
+      if (!user.emailVerified) {
+        try {
+          await verifyUserEmail(user.id);
+          user.emailVerified = true;
+        } catch (err) {
+          console.error('[Verify OTP] verifyUserEmail error:', err);
+        }
+      }
+
+      // Establish authenticated session token & cookie
+      const sessionToken = await createSessionToken({
+        id: user.id,
+        email: user.email,
+        role: user.role,
+        name: user.name,
+      });
+
+      await setSessionCookie(sessionToken);
+
       return NextResponse.json({
         success: true,
-        message: 'Your email address has been verified successfully. You can now sign in.',
+        user: sanitizeUser(user),
+        message: 'Verification successful. You are now logged in.',
       });
     } else {
       // purpose === 'reset_password'
-      // Generate a short-lived reset authorization token
       const resetToken = crypto.randomBytes(32).toString('hex');
       const resetTokenExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes authorization window
-
       await setUserPasswordResetToken(cleanEmail, resetToken, resetTokenExpires);
 
       return NextResponse.json({

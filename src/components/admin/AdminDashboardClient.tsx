@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth-client';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { AdminRouteId } from '@/components/admin/AdminSidebar';
 import { CategoriesManager } from '@/components/admin/CategoriesManager';
+import { TagsManager } from '@/components/admin/TagsManager';
 import { PostsManager } from '@/components/admin/PostsManager';
 import { PagesManager } from '@/components/admin/PagesManager';
 import { UsersManager } from '@/components/admin/UsersManager';
@@ -53,6 +54,8 @@ export function AdminDashboardClient({
   useEffect(() => {
     if (currentRoute === 'posts_add') {
       window.location.href = '/admin/posts/new';
+    } else if (currentRoute === 'pages_add') {
+      window.location.href = '/admin/pages/new';
     }
   }, [currentRoute]);
 
@@ -97,20 +100,20 @@ export function AdminDashboardClient({
     >
       <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto w-full">
         {/* Module Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-stone-800 pb-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-stone-200 pb-6">
           <div>
-            <h1 className="text-2xl font-serif font-bold text-white uppercase tracking-wider">
+            <h1 className="text-2xl font-serif font-bold text-stone-900 uppercase tracking-wider">
               {currentRoute.replace('_', ' ')}
             </h1>
-            <p className="text-xs text-stone-400 mt-1">
-              Connected to PostgreSQL Database via Drizzle ORM • Role: <span className="text-amber-400 font-bold uppercase">{currentUser?.role || 'ADMIN'}</span>
+            <p className="text-xs text-stone-500 mt-1">
+              Connected to PostgreSQL Database via Drizzle ORM • Role: <span className="text-pink-600 font-bold uppercase">{currentUser?.role || 'ADMIN'}</span>
             </p>
           </div>
           <button
             onClick={fetchAllAdminData}
-            className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-stone-300 border border-stone-800 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"
+            className="px-3.5 py-2 bg-white hover:bg-stone-50 text-stone-700 border border-stone-300 rounded-lg text-xs font-semibold shadow-xs transition flex items-center gap-1.5"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin' : ''}`} /> Refresh Data
+            <RefreshCw className={`w-3.5 h-3.5 ${loadingData ? 'animate-spin text-pink-600' : ''}`} /> Refresh Data
           </button>
         </div>
 
@@ -118,38 +121,38 @@ export function AdminDashboardClient({
         {currentRoute === 'dashboard' && (
           <div className="space-y-6">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className="bg-stone-900 border border-stone-800 p-5 rounded-xl space-y-2">
-                <span className="text-xs text-stone-400 uppercase tracking-wider font-mono">Total Articles</span>
-                <div className="text-3xl font-serif font-bold text-white">{posts.length}</div>
-                <div className="text-xs text-emerald-400 font-medium">+3 published today</div>
+              <div className="bg-white border border-stone-200 p-5 rounded-xl space-y-2 shadow-xs">
+                <span className="text-xs text-stone-500 uppercase tracking-wider font-mono">Total Articles</span>
+                <div className="text-3xl font-serif font-bold text-stone-900">{posts.length}</div>
+                <div className="text-xs text-emerald-600 font-medium">+3 published today</div>
               </div>
-              <div className="bg-stone-900 border border-stone-800 p-5 rounded-xl space-y-2">
-                <span className="text-xs text-stone-400 uppercase tracking-wider font-mono">Categories</span>
-                <div className="text-3xl font-serif font-bold text-white">{categories.length}</div>
-                <div className="text-xs text-stone-400 font-medium">Active taxonomy sectors</div>
+              <div className="bg-white border border-stone-200 p-5 rounded-xl space-y-2 shadow-xs">
+                <span className="text-xs text-stone-500 uppercase tracking-wider font-mono">Categories</span>
+                <div className="text-3xl font-serif font-bold text-stone-900">{categories.length}</div>
+                <div className="text-xs text-stone-500 font-medium">Active taxonomy sectors</div>
               </div>
-              <div className="bg-stone-900 border border-stone-800 p-5 rounded-xl space-y-2">
-                <span className="text-xs text-stone-400 uppercase tracking-wider font-mono">Comments Queue</span>
-                <div className="text-3xl font-serif font-bold text-white">{comments.length}</div>
-                <div className="text-xs text-amber-400 font-medium">{comments.filter((c) => c.status === 'pending').length} pending review</div>
+              <div className="bg-white border border-stone-200 p-5 rounded-xl space-y-2 shadow-xs">
+                <span className="text-xs text-stone-500 uppercase tracking-wider font-mono">Comments Queue</span>
+                <div className="text-3xl font-serif font-bold text-stone-900">{comments.length}</div>
+                <div className="text-xs text-amber-600 font-medium">{comments.filter((c) => c.status === 'pending').length} pending review</div>
               </div>
-              <div className="bg-stone-900 border border-stone-800 p-5 rounded-xl space-y-2">
-                <span className="text-xs text-stone-400 uppercase tracking-wider font-mono">User Accounts</span>
-                <div className="text-3xl font-serif font-bold text-white">{users.length}</div>
-                <div className="text-xs text-emerald-400 font-medium">RBAC active</div>
+              <div className="bg-white border border-stone-200 p-5 rounded-xl space-y-2 shadow-xs">
+                <span className="text-xs text-stone-500 uppercase tracking-wider font-mono">User Accounts</span>
+                <div className="text-3xl font-serif font-bold text-stone-900">{users.length}</div>
+                <div className="text-xs text-emerald-600 font-medium">RBAC active</div>
               </div>
             </div>
 
-            <div className="bg-stone-900 border border-stone-800 rounded-xl p-6 space-y-4">
-              <h3 className="font-serif text-lg font-bold text-white">Recent Editorial Activity</h3>
+            <div className="bg-white border border-stone-200 rounded-xl p-6 space-y-4 shadow-xs">
+              <h3 className="font-serif text-lg font-bold text-stone-900">Recent Editorial Activity</h3>
               <div className="space-y-3">
                 {posts.slice(0, 5).map((post) => (
-                  <div key={post.id} className="flex items-center justify-between py-3 border-b border-stone-800 last:border-0 text-sm">
+                  <div key={post.id} className="flex items-center justify-between py-3 border-b border-stone-100 last:border-0 text-sm">
                     <div>
-                      <div className="font-serif font-semibold text-stone-200">{post.title}</div>
-                      <div className="text-xs text-stone-400">By {post.author?.name || 'Staff'} • {post.status}</div>
+                      <div className="font-serif font-semibold text-stone-800">{post.title}</div>
+                      <div className="text-xs text-stone-500">By {post.author?.name || 'Staff'} • {post.status}</div>
                     </div>
-                    <span className="text-xs text-stone-500">{new Date(post.createdAt).toLocaleDateString()}</span>
+                    <span className="text-xs text-stone-400">{new Date(post.createdAt).toLocaleDateString()}</span>
                   </div>
                 ))}
               </div>
@@ -157,14 +160,18 @@ export function AdminDashboardClient({
           </div>
         )}
 
-        {(currentRoute === 'posts_all' || currentRoute === 'posts_add' || currentRoute === 'tags') && (
+        {(currentRoute === 'posts_all' || currentRoute === 'posts_add') && (
           <PostsManager
             initialPosts={posts}
             categories={categories}
             users={users}
-            initialMode={currentRoute === 'posts_add' ? 'add' : currentRoute === 'tags' ? 'tags' : 'all'}
+            initialMode={currentRoute === 'posts_add' ? 'add' : 'all'}
             onPostsUpdated={fetchAllAdminData}
           />
+        )}
+
+        {currentRoute === 'tags' && (
+          <TagsManager onTagsUpdated={fetchAllAdminData} />
         )}
 
         {currentRoute === 'categories' && (

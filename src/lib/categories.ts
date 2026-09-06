@@ -1,9 +1,31 @@
 import { Category, Post } from '@/types';
 
 /** Build the canonical public URL for a category or subcategory. */
-export function getCategoryUrl(category: Pick<Category, 'slug' | 'parentId'>, categories: Category[]): string {
-  const parent = category.parentId ? categories.find((candidate) => candidate.id === category.parentId) : undefined;
-  return parent ? `/${parent.slug}/${category.slug}` : `/${category.slug}`;
+export function getCategoryUrl(category: Pick<Category, 'slug' | 'parentId'> & { id?: string; name?: string }, categories: Category[]): string {
+  if (!category || !category.slug) return '/';
+  
+  let cleanSlug = category.slug.replace(/^\/+|\/+$/g, '').trim();
+  const lowerSlug = cleanSlug.toLowerCase();
+  if (lowerSlug === 'food' || lowerSlug === 'food-wine' || (category.id === 'cat_food' && !category.parentId)) {
+    cleanSlug = 'food-wine';
+  }
+  const catId = category.id;
+  
+  const parent = category.parentId && category.parentId !== catId
+    ? categories.find((candidate) => candidate.id === category.parentId && candidate.id !== catId)
+    : undefined;
+
+  if (parent && parent.slug) {
+    let cleanParentSlug = parent.slug.replace(/^\/+|\/+$/g, '').trim();
+    if (cleanParentSlug.toLowerCase() === 'food' || cleanParentSlug.toLowerCase() === 'food-wine' || (parent.id === 'cat_food' && !parent.parentId)) {
+      cleanParentSlug = 'food-wine';
+    }
+    if (cleanParentSlug && cleanParentSlug.toLowerCase() !== cleanSlug.toLowerCase()) {
+      return `/${cleanParentSlug}/${cleanSlug}`;
+    }
+  }
+
+  return `/${cleanSlug}`;
 }
 
 /** Build a canonical archive URL for a post's displayed category. */
@@ -62,12 +84,22 @@ export function filterPostsForCategoryTree(
   // Collect all category slugs in this hierarchy branch for robust slug-based matching
   const treeSlugs = new Set<string>();
   if (currentCategory.slug) {
-    treeSlugs.add(currentCategory.slug.toLowerCase().trim());
+    const s = currentCategory.slug.toLowerCase().trim();
+    treeSlugs.add(s);
+    if (s === 'food' || s === 'food-wine') {
+      treeSlugs.add('food');
+      treeSlugs.add('food-wine');
+    }
   }
   for (const catId of treeIds) {
     const found = categories.find((c) => c.id === catId);
     if (found?.slug) {
-      treeSlugs.add(found.slug.toLowerCase().trim());
+      const s = found.slug.toLowerCase().trim();
+      treeSlugs.add(s);
+      if (s === 'food' || s === 'food-wine') {
+        treeSlugs.add('food');
+        treeSlugs.add('food-wine');
+      }
     }
   }
 

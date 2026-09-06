@@ -59,7 +59,7 @@ export async function seedDatabase() {
 
   // 2. Seed Users with verified bcrypt passwords
   try {
-    const defaultPasswordHash = await bcrypt.hash('AdminPass2026!', 10);
+    const defaultPasswordHash = await bcrypt.hash('nayaandaaz@168', 10);
 
     for (const user of INITIAL_USERS) {
       await db
@@ -350,7 +350,7 @@ export async function seedDatabase() {
       { id: 'item_2', menuId: 'menu_primary', label: 'Entertainment', url: '/entertainment', categorySlug: 'entertainment', order: 1 },
       { id: 'item_3', menuId: 'menu_primary', label: 'Women Lifestyle', url: '/women-lifestyle', categorySlug: 'women-lifestyle', order: 2 },
       { id: 'item_4', menuId: 'menu_primary', label: 'Travel', url: '/travel', categorySlug: 'travel', order: 3 },
-      { id: 'item_5', menuId: 'menu_primary', label: 'Food & Wine', url: '/food', categorySlug: 'food', order: 4 },
+      { id: 'item_5', menuId: 'menu_primary', label: 'Food & Wine', url: '/food-wine', categorySlug: 'food-wine', order: 4 },
       { id: 'item_6', menuId: 'menu_primary', label: 'Career & Finance', url: '/career-finance', categorySlug: 'career-finance', order: 5 },
     ];
 
