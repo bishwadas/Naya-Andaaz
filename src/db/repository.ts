@@ -1919,6 +1919,18 @@ export async function createMedia(data: any) {
   return newMedia;
 }
 
+export async function getMediaById(id: string) {
+  try {
+    const item = await db.query.media.findFirst({
+      where: eq(media.id, id),
+    });
+    return item || null;
+  } catch (error) {
+    console.error('getMediaById failed:', error);
+    return null;
+  }
+}
+
 export async function deleteMedia(id: string) {
   return await db.delete(media).where(eq(media.id, id)).returning();
 }
