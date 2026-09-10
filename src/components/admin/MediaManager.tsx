@@ -91,10 +91,10 @@ export const MediaManager: React.FC<MediaManagerProps> = ({ initialMedia = [] })
 
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
-          throw new Error(data.error || 'Failed to upload image to Cloudinary.');
+          throw new Error(data.error || 'Failed to upload image to media storage.');
         }
 
-        setSuccessMsg('Image successfully uploaded to Cloudinary & saved to Media Vault!');
+        setSuccessMsg('Image successfully uploaded to Cloudinary and saved to database!');
       } else {
         if (!title.trim() || !url.trim()) {
           setErrorMsg('Title and Image URL are required.');
@@ -119,7 +119,7 @@ export const MediaManager: React.FC<MediaManagerProps> = ({ initialMedia = [] })
           throw new Error(errorData.error || 'Failed to add media item.');
         }
 
-        setSuccessMsg('Media item registered successfully!');
+        setSuccessMsg('Media item registered successfully in database!');
       }
 
       setTitle('');
@@ -391,7 +391,7 @@ export const MediaManager: React.FC<MediaManagerProps> = ({ initialMedia = [] })
                     className="w-full text-xs text-stone-600 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-pink-50 file:text-pink-700 hover:file:bg-pink-100 cursor-pointer border border-stone-300 rounded-lg p-1"
                   />
                   <p className="text-[10px] text-stone-400 mt-1">
-                    Image will be uploaded directly to Cloudinary and saved to your Media Vault.
+                    Image will be uploaded to Cloudinary media storage and saved to your Media Vault.
                   </p>
                 </div>
               ) : (

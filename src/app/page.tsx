@@ -154,25 +154,23 @@ export default async function HomePage() {
 
   try {
     const [fetchedCats, fetchedSettings, fetchedPosts, fetchedMenuItems] = await Promise.all([
-      getCategories().catch(() => INITIAL_CATEGORIES),
+      getCategories().catch(() => []),
       getSettings()
         .then((s) => (s ? (s as unknown as SiteSettings) : DEFAULT_SITE_SETTINGS))
         .catch(() => DEFAULT_SITE_SETTINGS),
-      getPosts({ status: 'published' }).catch(() => INITIAL_POSTS.filter((p) => p.status === 'published')),
+      getPosts({ status: 'published' }).catch(() => []),
       getPrimaryMenuItems().catch(() => []),
     ]);
 
-    categories = Array.isArray(fetchedCats) && fetchedCats.length > 0 ? fetchedCats : INITIAL_CATEGORIES;
+    categories = Array.isArray(fetchedCats) ? fetchedCats : [];
     settings = fetchedSettings || DEFAULT_SITE_SETTINGS;
-    allPublishedPosts = Array.isArray(fetchedPosts) && fetchedPosts.length > 0
-      ? fetchedPosts
-      : INITIAL_POSTS.filter((p) => p.status === 'published');
+    allPublishedPosts = Array.isArray(fetchedPosts) ? fetchedPosts : [];
     primaryMenuItems = Array.isArray(fetchedMenuItems) ? fetchedMenuItems : [];
   } catch (err) {
-    console.warn('Error loading HomePage data, utilizing initial fallbacks:', err);
-    categories = INITIAL_CATEGORIES;
+    console.warn('Error loading HomePage data:', err);
+    categories = [];
     settings = DEFAULT_SITE_SETTINGS;
-    allPublishedPosts = INITIAL_POSTS.filter((p) => p.status === 'published');
+    allPublishedPosts = [];
     primaryMenuItems = [];
   }
 

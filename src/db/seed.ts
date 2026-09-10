@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { db } from './index';
+import { db, initDatabaseSchema } from './index';
 import {
   activityLogs,
   advertisements,
@@ -32,7 +32,8 @@ import {
 } from '@/lib/mockData';
 
 export async function seedDatabase() {
-  console.log('🌱 Starting Sereia PostgreSQL Database Seed...');
+  console.log('🌱 Initializing SQLite Schema and Starting Naya Andaaz Seed...');
+  await initDatabaseSchema();
 
   // 1. Seed Site Settings
   try {

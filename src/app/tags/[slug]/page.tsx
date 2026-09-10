@@ -11,7 +11,7 @@ import {
 } from '@/db/repository';
 import { db } from '@/db';
 import { tags } from '@/db/schema';
-import { eq, or, ilike, and } from 'drizzle-orm';
+import { eq, or, like, and } from 'drizzle-orm';
 import { TagArchiveView } from '@/components/public/TagArchiveView';
 import { SiteSettings, Tag } from '@/types';
 import { DEFAULT_SITE_SETTINGS, INITIAL_TAGS } from '@/lib/constants';
@@ -68,7 +68,7 @@ export async function generateMetadata({
           or(
             eq(tags.slug, cleanSlug),
             eq(tags.slug, rawDecoded),
-            ilike(tags.name, cleanSlug.replace(/-/g, ' '))
+            like(tags.name, cleanSlug.replace(/-/g, ' '))
           ),
           eq(tags.isTrashed, false)
         ),
@@ -153,7 +153,7 @@ export default async function TagArchivePage({
           or(
             eq(tags.slug, cleanSlug),
             eq(tags.slug, rawDecoded),
-            ilike(tags.name, cleanSlug.replace(/-/g, ' '))
+            like(tags.name, cleanSlug.replace(/-/g, ' '))
           ),
           eq(tags.isTrashed, false)
         ),

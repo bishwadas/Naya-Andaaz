@@ -1,17 +1,14 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import {
-  boolean,
   index,
   integer,
-  jsonb,
-  pgTable,
+  sqliteTable,
   text,
-  timestamp,
   uniqueIndex,
-} from 'drizzle-orm/pg-core';
+} from 'drizzle-orm/sqlite-core';
 
 // 1. Users Table
-export const users = pgTable(
+export const users = sqliteTable(
   'users',
   {
     id: text('id').primaryKey(),
@@ -29,30 +26,30 @@ export const users = pgTable(
     facebook: text('facebook'),
     instagram: text('instagram'),
     linkedin: text('linkedin'),
-    isActive: boolean('is_active').notNull().default(true),
-    emailVerified: boolean('email_verified').notNull().default(false),
+    isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+    emailVerified: integer('email_verified', { mode: 'boolean' }).notNull().default(false),
     verificationToken: text('verification_token'),
-    verificationTokenExpires: timestamp('verification_token_expires', { withTimezone: true }),
+    verificationTokenExpires: integer('verification_token_expires', { mode: 'timestamp' }),
     passwordResetToken: text('password_reset_token'),
-    passwordResetTokenExpires: timestamp('password_reset_token_expires', { withTimezone: true }),
-    isTrashed: boolean('is_trashed').notNull().default(false),
-    trashedAt: timestamp('trashed_at', { withTimezone: true }),
-    lastLogin: timestamp('last_login', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    passwordResetTokenExpires: integer('password_reset_token_expires', { mode: 'timestamp' }),
+    isTrashed: integer('is_trashed', { mode: 'boolean' }).notNull().default(false),
+    trashedAt: integer('trashed_at', { mode: 'timestamp' }),
+    lastLogin: integer('last_login', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    emailIdx: index('users_email_idx').on(table.email),
-    usernameIdx: uniqueIndex('users_username_idx').on(table.username),
-    roleIdx: index('users_role_idx').on(table.role),
-    trashedIdx: index('users_trashed_idx').on(table.isTrashed),
-    verificationTokenIdx: index('users_verification_token_idx').on(table.verificationToken),
-    passwordResetTokenIdx: index('users_password_reset_token_idx').on(table.passwordResetToken),
-  })
+  (table) => [
+    index('users_email_idx').on(table.email),
+    uniqueIndex('users_username_idx').on(table.username),
+    index('users_role_idx').on(table.role),
+    index('users_trashed_idx').on(table.isTrashed),
+    index('users_verification_token_idx').on(table.verificationToken),
+    index('users_password_reset_token_idx').on(table.passwordResetToken),
+  ]
 );
 
 // 2. Categories Table
-export const categories = pgTable(
+export const categories = sqliteTable(
   'categories',
   {
     id: text('id').primaryKey(),
@@ -65,38 +62,38 @@ export const categories = pgTable(
     seoTitle: text('seo_title'),
     metaDescription: text('meta_description'),
     order: integer('order').default(0),
-    isTrashed: boolean('is_trashed').notNull().default(false),
-    trashedAt: timestamp('trashed_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    isTrashed: integer('is_trashed', { mode: 'boolean' }).notNull().default(false),
+    trashedAt: integer('trashed_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    slugIdx: uniqueIndex('categories_slug_idx').on(table.slug),
-    parentIdIdx: index('categories_parent_id_idx').on(table.parentId),
-    trashedIdx: index('categories_trashed_idx').on(table.isTrashed),
-  })
+  (table) => [
+    uniqueIndex('categories_slug_idx').on(table.slug),
+    index('categories_parent_id_idx').on(table.parentId),
+    index('categories_trashed_idx').on(table.isTrashed),
+  ]
 );
 
 // 3. Tags Table
-export const tags = pgTable(
+export const tags = sqliteTable(
   'tags',
   {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     slug: text('slug').notNull().unique(),
     description: text('description'),
-    isTrashed: boolean('is_trashed').notNull().default(false),
-    trashedAt: timestamp('trashed_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    isTrashed: integer('is_trashed', { mode: 'boolean' }).notNull().default(false),
+    trashedAt: integer('trashed_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    slugIdx: uniqueIndex('tags_slug_idx').on(table.slug),
-    trashedIdx: index('tags_trashed_idx').on(table.isTrashed),
-  })
+  (table) => [
+    uniqueIndex('tags_slug_idx').on(table.slug),
+    index('tags_trashed_idx').on(table.isTrashed),
+  ]
 );
 
 // 4. Posts Table
-export const posts = pgTable(
+export const posts = sqliteTable(
   'posts',
   {
     id: text('id').primaryKey(),
@@ -114,42 +111,41 @@ export const posts = pgTable(
       .references(() => categories.id, { onDelete: 'restrict' }),
     subCategoryId: text('sub_category_id').references(() => categories.id, { onDelete: 'set null' }),
     status: text('status').notNull().default('published'), // 'draft' | 'pending' | 'published' | 'scheduled' | 'trash'
-    isFeatured: boolean('is_featured').notNull().default(false),
-    isTrending: boolean('is_trending').notNull().default(false),
-    isEditorPick: boolean('is_editor_pick').notNull().default(false),
-    isTrashed: boolean('is_trashed').notNull().default(false),
-    trashedAt: timestamp('trashed_at', { withTimezone: true }),
+    isFeatured: integer('is_featured', { mode: 'boolean' }).notNull().default(false),
+    isTrending: integer('is_trending', { mode: 'boolean' }).notNull().default(false),
+    isEditorPick: integer('is_editor_pick', { mode: 'boolean' }).notNull().default(false),
+    isTrashed: integer('is_trashed', { mode: 'boolean' }).notNull().default(false),
+    trashedAt: integer('trashed_at', { mode: 'timestamp' }),
     views: integer('views').notNull().default(0),
     likes: integer('likes').notNull().default(0),
     readingTime: integer('reading_time').notNull().default(3),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
-    scheduledAt: timestamp('scheduled_at', { withTimezone: true }),
+    publishedAt: integer('published_at', { mode: 'timestamp' }),
+    scheduledAt: integer('scheduled_at', { mode: 'timestamp' }),
     seoTitle: text('seo_title'),
     metaDescription: text('meta_description'),
     focusKeyword: text('focus_keyword'),
     canonicalUrl: text('canonical_url'),
     ogImage: text('og_image'),
-    blocks: jsonb('blocks').$type<any[]>().default([]),
-    faqs: jsonb('faqs').$type<{ id: string; question: string; answer: string }[]>().default([]),
-    relatedPostIds: jsonb('related_post_ids').$type<string[]>().default([]),
-    allowComments: boolean('allow_comments').notNull().default(true),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    blocks: text('blocks', { mode: 'json' }).$type<any[]>().default([]),
+    faqs: text('faqs', { mode: 'json' }).$type<{ id: string; question: string; answer: string }[]>().default([]),
+    relatedPostIds: text('related_post_ids', { mode: 'json' }).$type<string[]>().default([]),
+    allowComments: integer('allow_comments', { mode: 'boolean' }).notNull().default(true),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    slugIdx: uniqueIndex('posts_slug_idx').on(table.slug),
-    statusIdx: index('posts_status_idx').on(table.status),
-    publishedAtIdx: index('posts_published_at_idx').on(table.publishedAt),
-    authorIdIdx: index('posts_author_id_idx').on(table.authorId),
-    categoryIdIdx: index('posts_category_id_idx').on(table.categoryId),
-    subCategoryIdIdx: index('posts_sub_category_id_idx').on(table.subCategoryId),
-    featuredTrendingIdx: index('posts_featured_trending_idx').on(table.isFeatured, table.isTrending),
-    trashedIdx: index('posts_trashed_idx').on(table.isTrashed),
-  })
+  (table) => [
+    uniqueIndex('posts_slug_idx').on(table.slug),
+    index('posts_status_idx').on(table.status),
+    index('posts_published_at_idx').on(table.publishedAt),
+    index('posts_author_id_idx').on(table.authorId),
+    index('posts_category_id_idx').on(table.categoryId),
+    index('posts_sub_category_id_idx').on(table.subCategoryId),
+    index('posts_trashed_idx').on(table.isTrashed),
+  ]
 );
 
 // 5. PostTags Junction Table
-export const postTags = pgTable(
+export const postTags = sqliteTable(
   'post_tags',
   {
     id: text('id').primaryKey(),
@@ -160,15 +156,15 @@ export const postTags = pgTable(
       .notNull()
       .references(() => tags.id, { onDelete: 'cascade' }),
   },
-  (table) => ({
-    postTagUniqueIdx: uniqueIndex('post_tags_post_tag_unique_idx').on(table.postId, table.tagId),
-    postIdIdx: index('post_tags_post_id_idx').on(table.postId),
-    tagIdIdx: index('post_tags_tag_id_idx').on(table.tagId),
-  })
+  (table) => [
+    uniqueIndex('post_tags_post_tag_unique_idx').on(table.postId, table.tagId),
+    index('post_tags_post_id_idx').on(table.postId),
+    index('post_tags_tag_id_idx').on(table.tagId),
+  ]
 );
 
 // 6. PostRevisions Table
-export const postRevisions = pgTable(
+export const postRevisions = sqliteTable(
   'post_revisions',
   {
     id: text('id').primaryKey(),
@@ -180,16 +176,16 @@ export const postRevisions = pgTable(
     excerpt: text('excerpt').notNull(),
     authorId: text('author_id').notNull(),
     authorName: text('author_name').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    postIdIdx: index('post_revisions_post_id_idx').on(table.postId),
-    createdAtIdx: index('post_revisions_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('post_revisions_post_id_idx').on(table.postId),
+    index('post_revisions_created_at_idx').on(table.createdAt),
+  ]
 );
 
 // 7. Media Table
-export const media = pgTable(
+export const media = sqliteTable(
   'media',
   {
     id: text('id').primaryKey(),
@@ -207,16 +203,16 @@ export const media = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     uploadedByName: text('uploaded_by_name'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    uploadedByIdx: index('media_uploaded_by_idx').on(table.uploadedBy),
-    createdAtIdx: index('media_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('media_uploaded_by_idx').on(table.uploadedBy),
+    index('media_created_at_idx').on(table.createdAt),
+  ]
 );
 
 // 8. Pages Table
-export const pages = pgTable(
+export const pages = sqliteTable(
   'pages',
   {
     id: text('id').primaryKey(),
@@ -231,21 +227,21 @@ export const pages = pgTable(
     authorName: text('author_name'),
     seoTitle: text('seo_title'),
     metaDescription: text('meta_description'),
-    isTrashed: boolean('is_trashed').notNull().default(false),
-    trashedAt: timestamp('trashed_at', { withTimezone: true }),
-    publishedAt: timestamp('published_at', { withTimezone: true }),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    isTrashed: integer('is_trashed', { mode: 'boolean' }).notNull().default(false),
+    trashedAt: integer('trashed_at', { mode: 'timestamp' }),
+    publishedAt: integer('published_at', { mode: 'timestamp' }),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    slugIdx: uniqueIndex('pages_slug_idx').on(table.slug),
-    statusIdx: index('pages_status_idx').on(table.status),
-    trashedIdx: index('pages_trashed_idx').on(table.isTrashed),
-  })
+  (table) => [
+    uniqueIndex('pages_slug_idx').on(table.slug),
+    index('pages_status_idx').on(table.status),
+    index('pages_trashed_idx').on(table.isTrashed),
+  ]
 );
 
 // 9. Comments Table
-export const comments = pgTable(
+export const comments = sqliteTable(
   'comments',
   {
     id: text('id').primaryKey(),
@@ -259,32 +255,32 @@ export const comments = pgTable(
     content: text('content').notNull(),
     status: text('status').notNull().default('approved'), // 'approved' | 'pending' | 'spam' | 'trash'
     parentId: text('parent_id'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    postIdIdx: index('comments_post_id_idx').on(table.postId),
-    statusIdx: index('comments_status_idx').on(table.status),
-    createdAtIdx: index('comments_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('comments_post_id_idx').on(table.postId),
+    index('comments_status_idx').on(table.status),
+    index('comments_created_at_idx').on(table.createdAt),
+  ]
 );
 
 // 10. Menus Table
-export const menus = pgTable(
+export const menus = sqliteTable(
   'menus',
   {
     id: text('id').primaryKey(),
     name: text('name').notNull(),
     location: text('location').notNull().unique(), // 'primary' | 'footer' | 'mobile'
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    locationIdx: uniqueIndex('menus_location_idx').on(table.location),
-  })
+  (table) => [
+    uniqueIndex('menus_location_idx').on(table.location),
+  ]
 );
 
 // 11. MenuItems Table
-export const menuItems = pgTable(
+export const menuItems = sqliteTable(
   'menu_items',
   {
     id: text('id').primaryKey(),
@@ -297,23 +293,23 @@ export const menuItems = pgTable(
     parentId: text('parent_id'),
     order: integer('order').notNull().default(0),
     target: text('target').default('_self'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    menuIdIdx: index('menu_items_menu_id_idx').on(table.menuId),
-    orderIdx: index('menu_items_order_idx').on(table.order),
-  })
+  (table) => [
+    index('menu_items_menu_id_idx').on(table.menuId),
+    index('menu_items_order_idx').on(table.order),
+  ]
 );
 
 // 12. SiteSettings Table (Key-Value)
-export const siteSettings = pgTable('site_settings', {
+export const siteSettings = sqliteTable('site_settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
 });
 
 // 13. ActivityLogs Table
-export const activityLogs = pgTable(
+export const activityLogs = sqliteTable(
   'activity_logs',
   {
     id: text('id').primaryKey(),
@@ -325,34 +321,34 @@ export const activityLogs = pgTable(
     targetId: text('target_id'),
     targetTitle: text('target_title').notNull(),
     ipAddress: text('ip_address'),
-    timestamp: timestamp('timestamp', { withTimezone: true }).notNull().defaultNow(),
+    timestamp: integer('timestamp', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    timestampIdx: index('activity_logs_timestamp_idx').on(table.timestamp),
-    userIdIdx: index('activity_logs_user_id_idx').on(table.userId),
-  })
+  (table) => [
+    index('activity_logs_timestamp_idx').on(table.timestamp),
+    index('activity_logs_user_id_idx').on(table.userId),
+  ]
 );
 
 // 14. Notifications Table
-export const notifications = pgTable(
+export const notifications = sqliteTable(
   'notifications',
   {
     id: text('id').primaryKey(),
     title: text('title').notNull(),
     message: text('message').notNull(),
     type: text('type').notNull().default('info'), // 'info' | 'warning' | 'success' | 'alert'
-    isRead: boolean('is_read').notNull().default(false),
+    isRead: integer('is_read', { mode: 'boolean' }).notNull().default(false),
     link: text('link'),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    isReadIdx: index('notifications_is_read_idx').on(table.isRead),
-    createdAtIdx: index('notifications_created_at_idx').on(table.createdAt),
-  })
+  (table) => [
+    index('notifications_is_read_idx').on(table.isRead),
+    index('notifications_created_at_idx').on(table.createdAt),
+  ]
 );
 
 // 15. Advertisements Table
-export const advertisements = pgTable(
+export const advertisements = sqliteTable(
   'advertisements',
   {
     id: text('id').primaryKey(),
@@ -363,21 +359,21 @@ export const advertisements = pgTable(
     imageUrl: text('image_url'),
     targetUrl: text('target_url'),
     status: text('status').notNull().default('active'), // 'active' | 'inactive'
-    startDate: timestamp('start_date', { withTimezone: true }),
-    endDate: timestamp('end_date', { withTimezone: true }),
+    startDate: integer('start_date', { mode: 'timestamp' }),
+    endDate: integer('end_date', { mode: 'timestamp' }),
     impressions: integer('impressions').notNull().default(0),
     clicks: integer('clicks').notNull().default(0),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    locationIdx: index('ads_location_idx').on(table.location),
-    statusIdx: index('ads_status_idx').on(table.status),
-  })
+  (table) => [
+    index('ads_location_idx').on(table.location),
+    index('ads_status_idx').on(table.status),
+  ]
 );
 
 // 16. Newsletters Table
-export const newsletters = pgTable(
+export const newsletters = sqliteTable(
   'newsletters',
   {
     id: text('id').primaryKey(),
@@ -385,16 +381,16 @@ export const newsletters = pgTable(
     name: text('name'),
     status: text('status').notNull().default('subscribed'), // 'subscribed' | 'unsubscribed'
     source: text('source').default('footer'),
-    subscribedAt: timestamp('subscribed_at', { withTimezone: true }).notNull().defaultNow(),
-    unsubscribedAt: timestamp('unsubscribed_at', { withTimezone: true }),
+    subscribedAt: integer('subscribed_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    unsubscribedAt: integer('unsubscribed_at', { mode: 'timestamp' }),
   },
-  (table) => ({
-    emailIdx: uniqueIndex('newsletters_email_idx').on(table.email),
-  })
+  (table) => [
+    uniqueIndex('newsletters_email_idx').on(table.email),
+  ]
 );
 
 // 17. Videos Table
-export const videos = pgTable(
+export const videos = sqliteTable(
   'videos',
   {
     id: text('id').primaryKey(),
@@ -408,13 +404,34 @@ export const videos = pgTable(
     categoryId: text('category_id'),
     authorId: text('author_id'),
     views: integer('views').notNull().default(0),
-    isFeatured: boolean('is_featured').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    isFeatured: integer('is_featured', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
   },
-  (table) => ({
-    slugIdx: uniqueIndex('videos_slug_idx').on(table.slug),
-  })
+  (table) => [
+    uniqueIndex('videos_slug_idx').on(table.slug),
+  ]
+);
+
+// 18. OTPs / Verification Codes Table
+export const otps = sqliteTable(
+  'otps',
+  {
+    id: text('id').primaryKey(),
+    email: text('email').notNull(),
+    otpHash: text('otp_hash').notNull(),
+    purpose: text('purpose').notNull(), // 'signup' | 'reset_password'
+    expiresAt: integer('expires_at', { mode: 'timestamp' }).notNull(),
+    attempts: integer('attempts').notNull().default(0),
+    maxAttempts: integer('max_attempts').notNull().default(5),
+    isUsed: integer('is_used', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+    updatedAt: integer('updated_at', { mode: 'timestamp' }).notNull().default(sql`(strftime('%s', 'now'))`),
+  },
+  (table) => [
+    index('otps_email_purpose_idx').on(table.email, table.purpose),
+    index('otps_expires_at_idx').on(table.expiresAt),
+  ]
 );
 
 // Relational Definitions
@@ -513,24 +530,3 @@ export const menuItemsRelations = relations(menuItems, ({ one }) => ({
     references: [menus.id],
   }),
 }));
-
-// 12. OTPs / Verification Codes Table
-export const otps = pgTable(
-  'otps',
-  {
-    id: text('id').primaryKey(),
-    email: text('email').notNull(),
-    otpHash: text('otp_hash').notNull(),
-    purpose: text('purpose').notNull(), // 'signup' | 'reset_password'
-    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
-    attempts: integer('attempts').notNull().default(0),
-    maxAttempts: integer('max_attempts').notNull().default(5),
-    isUsed: boolean('is_used').notNull().default(false),
-    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => ({
-    emailPurposeIdx: index('otps_email_purpose_idx').on(table.email, table.purpose),
-    expiresAtIdx: index('otps_expires_at_idx').on(table.expiresAt),
-  })
-);

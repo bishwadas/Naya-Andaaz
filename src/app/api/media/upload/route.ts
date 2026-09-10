@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeRequest } from '@/lib/auth';
 import { createMediaItem } from '@/db/repository';
-import { uploadToCloudinary, isCloudinaryConfigured } from '@/lib/cloudinary';
+import { saveUploadedFile } from '@/lib/storage';
 import path from 'path';
 
 export const dynamic = 'force-dynamic';
@@ -16,10 +16,12 @@ const ALLOWED_MIME_TYPES = [
   'image/avif',
   'image/x-icon',
   'image/vnd.microsoft.icon',
+  'video/mp4',
+  'video/webm',
 ];
 
-const ALLOWED_EXTENSIONS = ['.svg', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif', '.ico'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_EXTENSIONS = ['.svg', '.png', '.jpg', '.jpeg', '.webp', '.gif', '.avif', '.ico', '.mp4', '.webm'];
+const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25 MB
 
 function isSvgMalicious(svgText: string): boolean {
   const lower = svgText.toLowerCase();
@@ -49,40 +51,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Check Cloudinary Configuration
-    if (!isCloudinaryConfigured()) {
-      return NextResponse.json(
-        {
-          error:
-            'Missing Cloudinary configuration. Please configure the CLOUDINARY_URL environment variable in your environment settings.',
-        },
-        { status: 500 }
-      );
-    }
-
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     const title = (formData.get('title') as string) || '';
     const altText = (formData.get('altText') as string) || '';
     const caption = (formData.get('caption') as string) || '';
-    const folder = (formData.get('folder') as string) || 'sereia_cms';
+    const folder = (formData.get('folder') as string) || 'images';
 
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // File Size Check
+    // File Size Check (25 MB max)
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: 'File size exceeds maximum limit of 10MB' }, { status: 400 });
+      return NextResponse.json({ error: 'File size exceeds maximum limit of 25MB' }, { status: 400 });
     }
 
     const ext = path.extname(file.name).toLowerCase();
-    const mime = file.type.toLowerCase();
+    const mime = (file.type || 'image/jpeg').toLowerCase();
 
     // File Type & Format Check
     if ((ext && !ALLOWED_EXTENSIONS.includes(ext)) || (mime && !ALLOWED_MIME_TYPES.includes(mime))) {
       return NextResponse.json(
-        { error: `Unsupported format or invalid file type (${file.type || ext}). Allowed formats: SVG, PNG, JPG, WebP, GIF, AVIF, ICO.` },
+        { error: `Unsupported format or invalid file type (${file.type || ext}). Allowed formats: JPG, PNG, WebP, GIF, SVG, AVIF, MP4, WebM.` },
         { status: 400 }
       );
     }
@@ -101,53 +92,45 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Upload to Cloudinary
-    let cloudinaryResult;
-    try {
-      cloudinaryResult = await uploadToCloudinary(buffer, {
-        filename: file.name,
-        folder: folder,
-      });
-    } catch (cErr: any) {
-      console.error('Cloudinary upload error:', cErr);
-      const msg = cErr.message || 'Cloudinary upload failed';
-      const isAuthError =
-        msg.includes('authentication') || msg.includes('CLOUDINARY_URL') || msg.includes('api_key');
-      return NextResponse.json(
-        { error: msg },
-        { status: isAuthError ? 401 : 500 }
-      );
-    }
+    // Determine subfolder: 'images' or 'media'
+    const isImage = mime.startsWith('image/');
+    const subfolder = isImage ? 'images' : 'media';
 
-    const imageUrl = cloudinaryResult.optimizedUrl || cloudinaryResult.secureUrl;
+    // Save physically to Persistent Volume (under /data/uploads/images or /data/uploads/media)
+    const saved = await saveUploadedFile(buffer, file.name, {
+      subfolder,
+      mimeType: file.type || mime,
+    });
+
     const mediaTitle = title.trim() || file.name.replace(/\.[^/.]+$/, '');
 
-    // Save URL and metadata in Database
+    // Save media record in SQLite database
     let savedMediaItem = null;
     try {
       savedMediaItem = await createMediaItem({
         title: mediaTitle,
-        fileName: cloudinaryResult.publicId || file.name,
-        url: imageUrl,
-        mimeType: file.type || 'image/png',
-        fileSize: cloudinaryResult.bytes || file.size,
+        fileName: saved.fileName,
+        url: saved.url,
+        mimeType: saved.mimeType,
+        fileSize: saved.fileSize,
         altText: altText || mediaTitle,
         caption: caption,
         uploadedBy: auth.user?.userId || 'usr_admin_01',
         uploadedByName: auth.user?.name || 'Admin',
       });
     } catch (dbErr) {
-      console.warn('Media record creation in DB failed, but Cloudinary upload succeeded:', dbErr);
+      console.warn('Media record creation in DB failed, but file was saved:', dbErr);
     }
 
     return NextResponse.json({
       success: true,
-      url: imageUrl,
-      secureUrl: cloudinaryResult.secureUrl,
-      publicId: cloudinaryResult.publicId,
-      fileName: cloudinaryResult.publicId,
-      fileSize: cloudinaryResult.bytes || file.size,
-      mimeType: file.type,
+      url: saved.url,
+      secureUrl: saved.url,
+      publicId: saved.fileName,
+      fileName: saved.fileName,
+      fileSize: saved.fileSize,
+      mimeType: saved.mimeType,
+      provider: 'persistent_storage',
       media: savedMediaItem,
     });
   } catch (error: any) {
@@ -155,4 +138,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Upload failed' }, { status: 500 });
   }
 }
-

@@ -160,7 +160,7 @@ export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   trendingTickerText: 'BREAKING: Global Fashion Week unveils sustainable forward trends • Venice Film Festival announcements • Tech innovations for 2026',
   defaultSeoTitle: 'Naya Andaaz — News, Magazine & Contemporary Lifestyle',
   defaultMetaDescription: 'Naya Andaaz brings you the latest news, stories and updates on entertainment, lifestyle, fashion, travel, food, wellness, relationships and more.',
-  defaultOgImage: 'https://res.cloudinary.com/adstnwn7/image/upload/f_auto,q_auto/v1/sereia_cms/1000064066_1788093083041?_a=BAMAAAcg0',
+  defaultOgImage: 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&h=630&q=80',
   googleAnalyticsId: 'G-NAYAANDAAZ2026',
   // Social links
   socialLinks: [

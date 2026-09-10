@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { Mukta } from 'next/font/google';
+import localFont from 'next/font/local';
 import NextTopLoader from 'nextjs-toploader';
 import { AuthProvider } from '@/lib/auth-client';
 import { getSettings } from '@/db/repository';
@@ -15,12 +15,47 @@ import {
 } from '@/lib/seo';
 import '@/index.css';
 
-const mukta = Mukta({
-  subsets: ['latin', 'devanagari'],
-  weight: ['200', '300', '400', '500', '600', '700', '800'],
+const mukta = localFont({
+  src: [
+    {
+      path: '../fonts/mukta/mukta-latin-200-normal.woff2',
+      weight: '200',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/mukta/mukta-latin-300-normal.woff2',
+      weight: '300',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/mukta/mukta-latin-400-normal.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/mukta/mukta-latin-500-normal.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/mukta/mukta-latin-600-normal.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/mukta/mukta-latin-700-normal.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+    {
+      path: '../fonts/mukta/mukta-latin-800-normal.woff2',
+      weight: '800',
+      style: 'normal',
+    },
+  ],
   display: 'swap',
   variable: '--font-mukta',
-  preload: true,
+  fallback: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
 });
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -97,9 +132,7 @@ export default async function RootLayout({
     <html lang="en" suppressHydrationWarning className={`h-full bg-[#fbfaf8] text-[#1c1917] antialiased ${mukta.variable}`}>
       <head>
         <link rel="preconnect" href="https://images.unsplash.com" crossOrigin="anonymous" />
-        <link rel="preconnect" href="https://res.cloudinary.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://images.unsplash.com" />
-        <link rel="dns-prefetch" href="https://res.cloudinary.com" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

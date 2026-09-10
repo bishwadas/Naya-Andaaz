@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getUserByEmail, getUserByUsername, updateUser } from '@/db/repository';
 import { createSessionToken, setSessionCookie, verifyPassword, sanitizeUser } from '@/lib/auth';
 import { isEmailVerificationEnabled } from '@/lib/auth-config';
-import { INITIAL_USERS } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,17 +18,7 @@ export async function POST(req: NextRequest) {
     }
 
     const cleanEmail = email.trim().toLowerCase();
-    let user = (await getUserByEmail(cleanEmail)) || (await getUserByUsername(cleanEmail));
-
-    // Fallback to initial users if database is unseeded or during initial setup
-    if (!user) {
-      const match = INITIAL_USERS.find(
-        (u) => u.email.toLowerCase() === cleanEmail || u.username.toLowerCase() === cleanEmail
-      );
-      if (match) {
-        user = { ...match } as any;
-      }
-    }
+    const user = (await getUserByEmail(cleanEmail)) || (await getUserByUsername(cleanEmail));
 
     if (!user || user.isActive === false || !user.passwordHash) {
       return NextResponse.json(

@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, ne, or, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, like, inArray, lte, ne, or, sql } from 'drizzle-orm';
 import { db } from './index';
 import {
   activityLogs,
@@ -21,18 +21,7 @@ import {
 } from './schema';
 import { Category, Post, Tag, User } from '@/types';
 import { getCategoryTreeIds } from '@/lib/categories';
-import {
-  DEFAULT_SITE_SETTINGS,
-  INITIAL_CATEGORIES,
-  INITIAL_TAGS,
-  INITIAL_USERS,
-} from '@/lib/constants';
-import {
-  INITIAL_ACTIVITY_LOGS,
-  INITIAL_MEDIA,
-  INITIAL_PAGES,
-  INITIAL_POSTS,
-} from '@/lib/mockData';
+import { DEFAULT_SITE_SETTINGS } from '@/lib/constants';
 
 // ----------------------------------------------------
 // VALIDATION HELPERS
@@ -248,8 +237,8 @@ async function buildPostQueryConditions(params: GetPostsParams) {
         or(
           eq(tags.slug, cleanTagSlug),
           eq(tags.slug, cleanTagWithHyphen),
-          ilike(tags.slug, cleanTagSlug),
-          ilike(tags.name, cleanTagSlug)
+          like(tags.slug, cleanTagSlug),
+          like(tags.name, cleanTagSlug)
         ),
         eq(tags.isTrashed, false)
       ),
@@ -326,8 +315,8 @@ async function buildPostQueryConditions(params: GetPostsParams) {
       .from(categories)
       .where(
         or(
-          ilike(categories.name, `%${searchTerm}%`),
-          ilike(categories.slug, `%${searchTerm}%`)
+          like(categories.name, `%${searchTerm}%`),
+          like(categories.slug, `%${searchTerm}%`)
         )
       );
     const catIds = matchingCats.map((c) => c.id);
@@ -338,8 +327,8 @@ async function buildPostQueryConditions(params: GetPostsParams) {
       .from(tags)
       .where(
         or(
-          ilike(tags.name, `%${searchTerm}%`),
-          ilike(tags.slug, `%${searchTerm}%`)
+          like(tags.name, `%${searchTerm}%`),
+          like(tags.slug, `%${searchTerm}%`)
         )
       );
     const tagIds = matchingTags.map((t) => t.id);
@@ -354,13 +343,13 @@ async function buildPostQueryConditions(params: GetPostsParams) {
     }
 
     const searchConditions = [
-      ilike(posts.title, `%${searchTerm}%`),
-      ilike(posts.slug, `%${searchTerm}%`),
-      ilike(posts.excerpt, `%${searchTerm}%`),
-      ilike(posts.content, `%${searchTerm}%`),
-      ilike(posts.focusKeyword, `%${searchTerm}%`),
-      ilike(posts.seoTitle, `%${searchTerm}%`),
-      ilike(posts.metaDescription, `%${searchTerm}%`),
+      like(posts.title, `%${searchTerm}%`),
+      like(posts.slug, `%${searchTerm}%`),
+      like(posts.excerpt, `%${searchTerm}%`),
+      like(posts.content, `%${searchTerm}%`),
+      like(posts.focusKeyword, `%${searchTerm}%`),
+      like(posts.seoTitle, `%${searchTerm}%`),
+      like(posts.metaDescription, `%${searchTerm}%`),
     ];
 
     if (catIds.length > 0) {
@@ -402,11 +391,11 @@ export async function getPostCounts(): Promise<PostCounts> {
   } catch (error) {
     console.error('Failed to query post counts:', error);
     return {
-      all: INITIAL_POSTS.length,
-      published: INITIAL_POSTS.filter((p) => p.status === 'published').length,
-      draft: INITIAL_POSTS.filter((p) => p.status === 'draft').length,
-      scheduled: INITIAL_POSTS.filter((p) => p.status === 'scheduled').length,
-      pending: INITIAL_POSTS.filter((p) => p.status === 'pending').length,
+      all: 0,
+      published: 0,
+      draft: 0,
+      scheduled: 0,
+      pending: 0,
       trash: 0,
     };
   }
@@ -486,14 +475,16 @@ export async function getPosts(params: GetPostsParams = {}): Promise<Post[]> {
             slug: p.subCategory.slug,
           }
         : null,
-      tagIds: p.postTags.map((pt) => pt.tagId),
-      tags: p.postTags.map((pt) => ({
-        id: pt.tag.id,
-        name: pt.tag.name,
-        slug: pt.tag.slug,
-        description: pt.tag.description || undefined,
-        createdAt: pt.tag.createdAt.toISOString(),
-      })),
+      tagIds: (p.postTags || []).map((pt) => pt.tagId),
+      tags: (p.postTags || [])
+        .filter((pt) => pt && pt.tag)
+        .map((pt) => ({
+          id: pt.tag.id,
+          name: pt.tag.name,
+          slug: pt.tag.slug,
+          description: pt.tag.description || undefined,
+          createdAt: pt.tag.createdAt ? pt.tag.createdAt.toISOString() : new Date().toISOString(),
+        })),
       status: p.status as any,
       isFeatured: p.isFeatured,
       isTrending: p.isTrending,
@@ -516,62 +507,8 @@ export async function getPosts(params: GetPostsParams = {}): Promise<Post[]> {
       updatedAt: p.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getPosts query failed, falling back to INITIAL_POSTS:', error);
-    let filtered = [...INITIAL_POSTS];
-    if (params.status && params.status !== 'all') {
-      filtered = filtered.filter((p) => p.status === params.status);
-    }
-    if (params.categoryId) {
-      filtered = filtered.filter(
-        (p) => p.categoryId === params.categoryId || p.category?.id === params.categoryId
-      );
-    }
-    if (params.categorySlug) {
-      const slugLower = params.categorySlug.toLowerCase().trim();
-      const isFood = slugLower === 'food' || slugLower === 'food-wine';
-      filtered = filtered.filter((p) => {
-        const pCatSlug = p.category?.slug?.toLowerCase()?.trim();
-        const pSubCatSlug = p.subCategory?.slug?.toLowerCase()?.trim();
-        if (isFood) {
-          return (
-            pCatSlug === 'food' ||
-            pCatSlug === 'food-wine' ||
-            pSubCatSlug === 'food' ||
-            pSubCatSlug === 'food-wine' ||
-            p.categoryId === 'cat_food'
-          );
-        }
-        return pCatSlug === slugLower || pSubCatSlug === slugLower;
-      });
-    }
-    if (params.authorId) {
-      filtered = filtered.filter(
-        (p) => p.authorId === params.authorId || p.author?.id === params.authorId
-      );
-    }
-    if (params.isFeatured !== undefined) {
-      filtered = filtered.filter((p) => p.isFeatured === params.isFeatured);
-    }
-    if (params.isTrending !== undefined) {
-      filtered = filtered.filter((p) => p.isTrending === params.isTrending);
-    }
-    if (params.isEditorPick !== undefined) {
-      filtered = filtered.filter((p) => p.isEditorPick === params.isEditorPick);
-    }
-    if (params.search && params.search.trim()) {
-      const term = params.search.toLowerCase().trim();
-      filtered = filtered.filter(
-        (p) =>
-          p.title.toLowerCase().includes(term) ||
-          p.content.toLowerCase().includes(term) ||
-          (p.excerpt && p.excerpt.toLowerCase().includes(term))
-      );
-    }
-    if (params.limit) {
-      const offset = params.offset || 0;
-      filtered = filtered.slice(offset, offset + params.limit);
-    }
-    return filtered;
+    console.warn('getPosts query failed:', error);
+    return [];
   }
 }
 
@@ -608,11 +545,11 @@ export async function getPostsPaginated(params: GetPostsParams = {}): Promise<Pa
     console.error('getPostsPaginated failed:', error);
     const counts = await getPostCounts();
     return {
-      posts: INITIAL_POSTS.slice(0, 20),
-      total: INITIAL_POSTS.length,
+      posts: [],
+      total: 0,
       page: 1,
       limit: 20,
-      totalPages: Math.ceil(INITIAL_POSTS.length / 20),
+      totalPages: 1,
       counts,
     };
   }
@@ -788,14 +725,16 @@ export async function getPostBySlug(slugOrId: string) {
             slug: p.subCategory.slug,
           }
         : null,
-      tagIds: p.postTags.map((pt) => pt.tagId),
-      tags: p.postTags.map((pt) => ({
-        id: pt.tag.id,
-        name: pt.tag.name,
-        slug: pt.tag.slug,
-        description: pt.tag.description || undefined,
-        createdAt: pt.tag.createdAt.toISOString(),
-      })),
+      tagIds: (p.postTags || []).map((pt) => pt.tagId),
+      tags: (p.postTags || [])
+        .filter((pt) => pt && pt.tag)
+        .map((pt) => ({
+          id: pt.tag.id,
+          name: pt.tag.name,
+          slug: pt.tag.slug,
+          description: pt.tag.description || undefined,
+          createdAt: pt.tag.createdAt ? pt.tag.createdAt.toISOString() : new Date().toISOString(),
+        })),
       status: p.status as any,
       isFeatured: p.isFeatured,
       isTrending: p.isTrending,
@@ -818,11 +757,8 @@ export async function getPostBySlug(slugOrId: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getPostBySlug failed, falling back to INITIAL_POSTS:', error);
-    const matched = INITIAL_POSTS.find(
-      (p) => p.slug === slugOrId || p.id === slugOrId
-    );
-    return matched || null;
+    console.warn('getPostBySlug failed:', error);
+    return null;
   }
 }
 
@@ -1414,8 +1350,8 @@ export async function getCategories() {
       };
     });
   } catch (error) {
-    console.warn('getCategories query failed, falling back to INITIAL_CATEGORIES:', error);
-    return INITIAL_CATEGORIES;
+    console.warn('getCategories query failed:', error);
+    return [];
   }
 }
 
@@ -1754,8 +1690,8 @@ export async function getTags() {
       createdAt: t.createdAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getTags failed, falling back to INITIAL_TAGS:', error);
-    return INITIAL_TAGS;
+    console.warn('getTags failed:', error);
+    return [];
   }
 }
 
@@ -1919,6 +1855,18 @@ export async function createMedia(data: any) {
   return newMedia;
 }
 
+export async function getMediaById(id: string) {
+  try {
+    const item = await db.query.media.findFirst({
+      where: eq(media.id, id),
+    });
+    return item || null;
+  } catch (error) {
+    console.error('getMediaById failed:', error);
+    return null;
+  }
+}
+
 export async function deleteMedia(id: string) {
   return await db.delete(media).where(eq(media.id, id)).returning();
 }
@@ -2046,8 +1994,8 @@ export async function getPages() {
       updatedAt: p.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getPages failed, falling back to INITIAL_PAGES:', error);
-    return INITIAL_PAGES;
+    console.warn('getPages failed:', error);
+    return [];
   }
 }
 
@@ -2078,9 +2026,8 @@ export async function getPageById(id: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getPageById failed, falling back to INITIAL_PAGES:', error);
-    const matched = INITIAL_PAGES.find((page) => page.id === id);
-    return matched || null;
+    console.warn('getPageById failed:', error);
+    return null;
   }
 }
 
@@ -2111,11 +2058,8 @@ export async function getPageBySlug(slug: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getPageBySlug failed, falling back to INITIAL_PAGES:', error);
-    const matched = INITIAL_PAGES.find(
-      (page) => page.slug.toLowerCase() === slug.toLowerCase().trim()
-    );
-    return matched || null;
+    console.warn('getPageBySlug failed:', error);
+    return null;
   }
 }
 
@@ -2280,8 +2224,8 @@ export async function getUsers() {
       updatedAt: u.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getUsers failed, falling back to INITIAL_USERS:', error);
-    return INITIAL_USERS;
+    console.warn('getUsers failed:', error);
+    return [];
   }
 }
 
@@ -2291,22 +2235,6 @@ export async function getUserById(id: string) {
       where: and(eq(users.id, id), eq(users.isTrashed, false)),
     });
     if (!u) {
-      const fallbackUser = INITIAL_USERS.find((usr) => usr.id === id);
-      if (fallbackUser) return fallbackUser;
-      if (id === 'usr_admin_01') {
-        return {
-          id: 'usr_admin_01',
-          name: 'Elena Rostova',
-          username: 'elena.rostova',
-          email: 'hello@nayaandaaz.com',
-          role: 'admin' as any,
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-          isActive: true,
-          emailVerified: true,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-      }
       return null;
     }
     return {
@@ -2333,23 +2261,7 @@ export async function getUserById(id: string) {
       updatedAt: u.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getUserById failed, falling back to INITIAL_USERS:', error);
-    const fallbackUser = INITIAL_USERS.find((usr) => usr.id === id);
-    if (fallbackUser) return fallbackUser;
-    if (id === 'usr_admin_01') {
-      return {
-        id: 'usr_admin_01',
-        name: 'Elena Rostova',
-        username: 'elena.rostova',
-        email: 'hello@nayaandaaz.com',
-        role: 'admin' as any,
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-        isActive: true,
-        emailVerified: true,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-    }
+    console.warn('getUserById failed:', error);
     return null;
   }
 }
