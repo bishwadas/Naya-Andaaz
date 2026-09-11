@@ -27,12 +27,415 @@ import {
   INITIAL_TAGS,
   INITIAL_USERS,
 } from '@/lib/constants';
+import fs from 'fs';
+import path from 'path';
 import {
   INITIAL_ACTIVITY_LOGS,
   INITIAL_MEDIA,
   INITIAL_PAGES,
   INITIAL_POSTS,
 } from '@/lib/mockData';
+
+// ----------------------------------------------------
+// IN-MEMORY ACTIVE STORAGE & PERSISTENCE
+// ----------------------------------------------------
+const SNAPSHOT_FILE_PATH = path.join(process.cwd(), 'public', 'database-snapshot.json');
+
+export let _memoryPosts: Post[] = [...INITIAL_POSTS];
+export let _memoryCategories: Category[] = [...INITIAL_CATEGORIES];
+export let _memoryTags: Tag[] = [...INITIAL_TAGS];
+export let _memoryUsers: User[] = [...INITIAL_USERS];
+export let _memoryPages: any[] = [...INITIAL_PAGES];
+export let _memoryMedia: any[] = [...INITIAL_MEDIA];
+export let _memoryComments: any[] = [];
+export let _memoryMenus: any[] = [];
+export let _memorySettings: Record<string, any> = { ...DEFAULT_SITE_SETTINGS };
+export let _memoryAds: any[] = [];
+export let _memoryNewsletters: any[] = [];
+export let _memoryVideos: any[] = [];
+export let _memoryLogs: any[] = [...INITIAL_ACTIVITY_LOGS];
+export let _memoryNotifications: any[] = [];
+
+// Try loading snapshot on module load
+try {
+  if (fs.existsSync(SNAPSHOT_FILE_PATH)) {
+    const raw = fs.readFileSync(SNAPSHOT_FILE_PATH, 'utf-8');
+    const parsed = JSON.parse(raw);
+    if (parsed.posts && Array.isArray(parsed.posts)) _memoryPosts = parsed.posts;
+    if (parsed.categories && Array.isArray(parsed.categories)) _memoryCategories = parsed.categories;
+    if (parsed.tags && Array.isArray(parsed.tags)) _memoryTags = parsed.tags;
+    if (parsed.users && Array.isArray(parsed.users)) _memoryUsers = parsed.users;
+    if (parsed.pages && Array.isArray(parsed.pages)) _memoryPages = parsed.pages;
+    if (parsed.media && Array.isArray(parsed.media)) _memoryMedia = parsed.media;
+    if (parsed.comments && Array.isArray(parsed.comments)) _memoryComments = parsed.comments;
+    if (parsed.menus && Array.isArray(parsed.menus)) _memoryMenus = parsed.menus;
+    if (parsed.siteSettings) _memorySettings = { ...DEFAULT_SITE_SETTINGS, ...parsed.siteSettings };
+    if (parsed.advertisements && Array.isArray(parsed.advertisements)) _memoryAds = parsed.advertisements;
+    if (parsed.newsletters && Array.isArray(parsed.newsletters)) _memoryNewsletters = parsed.newsletters;
+    if (parsed.videos && Array.isArray(parsed.videos)) _memoryVideos = parsed.videos;
+    if (parsed.activityLogs && Array.isArray(parsed.activityLogs)) _memoryLogs = parsed.activityLogs;
+    if (parsed.notifications && Array.isArray(parsed.notifications)) _memoryNotifications = parsed.notifications;
+  }
+} catch (e) {
+  console.warn('Failed to load database-snapshot.json:', e);
+}
+
+export function saveMemoryStoreToDisk() {
+  try {
+    const data = {
+      posts: _memoryPosts,
+      categories: _memoryCategories,
+      tags: _memoryTags,
+      users: _memoryUsers,
+      pages: _memoryPages,
+      media: _memoryMedia,
+      comments: _memoryComments,
+      menus: _memoryMenus,
+      siteSettings: _memorySettings,
+      advertisements: _memoryAds,
+      newsletters: _memoryNewsletters,
+      videos: _memoryVideos,
+      activityLogs: _memoryLogs,
+      notifications: _memoryNotifications,
+      updatedAt: new Date().toISOString(),
+    };
+    const dir = path.dirname(SNAPSHOT_FILE_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(SNAPSHOT_FILE_PATH, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.warn('Failed to save memory store to disk:', err);
+  }
+}
+
+export function applyRestoredBackupToMemory(
+  data: any,
+  mode: 'skip' | 'update' | 'create_new' = 'skip'
+): Record<string, number> {
+  const counts: Record<string, number> = {
+    users: 0,
+    categories: 0,
+    tags: 0,
+    posts: 0,
+    pages: 0,
+    media: 0,
+    comments: 0,
+    menus: 0,
+    siteSettings: 0,
+    advertisements: 0,
+    newsletters: 0,
+    videos: 0,
+    activityLogs: 0,
+    notifications: 0,
+  };
+
+  const suffix = Date.now().toString(36);
+
+  // 1. Site Settings
+  if (Array.isArray(data.siteSettings)) {
+    for (const s of data.siteSettings) {
+      if (!s.key) continue;
+      let val = s.value;
+      if (typeof val === 'string') {
+        try {
+          val = JSON.parse(val);
+        } catch {}
+      }
+      if (_memorySettings[s.key] === undefined || mode === 'update' || mode === 'create_new') {
+        _memorySettings[s.key] = val;
+        counts.siteSettings++;
+      }
+    }
+  }
+
+  // 2. Users
+  const userIdMap = new Map<string, string>();
+  if (Array.isArray(data.users)) {
+    for (const u of data.users) {
+      if (!u.id) continue;
+      const existingIdx = _memoryUsers.findIndex(
+        (ex) => ex.id === u.id || (u.email && ex.email?.toLowerCase() === u.email.toLowerCase())
+      );
+      if (existingIdx >= 0 && mode !== 'create_new') {
+        userIdMap.set(u.id, _memoryUsers[existingIdx].id);
+        if (mode === 'update') {
+          _memoryUsers[existingIdx] = { ..._memoryUsers[existingIdx], ...u };
+          counts.users++;
+        }
+      } else {
+        const newId = mode === 'create_new' ? `usr_${suffix}_${Math.random().toString(36).substring(2, 6)}` : u.id;
+        const newEmail = mode === 'create_new' ? `copy_${suffix}_${u.email}` : u.email;
+        const userObj: User = {
+          id: newId,
+          name: u.name || 'User',
+          username: u.username || u.name?.toLowerCase().replace(/\s+/g, '.') || newId,
+          email: newEmail,
+          role: u.role || 'subscriber',
+          avatar: u.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          bio: u.bio,
+          website: u.website,
+          twitter: u.twitter,
+          facebook: u.facebook,
+          instagram: u.instagram,
+          linkedin: u.linkedin,
+          isActive: u.isActive ?? true,
+          createdAt: u.createdAt ? new Date(u.createdAt).toISOString() : new Date().toISOString(),
+          updatedAt: u.updatedAt ? new Date(u.updatedAt).toISOString() : new Date().toISOString(),
+        };
+        _memoryUsers.push(userObj);
+        userIdMap.set(u.id, newId);
+        counts.users++;
+      }
+    }
+  }
+
+  // 3. Categories
+  const categoryIdMap = new Map<string, string>();
+  if (Array.isArray(data.categories)) {
+    for (const c of data.categories) {
+      if (!c.id || !c.slug) continue;
+      const existingIdx = _memoryCategories.findIndex(
+        (ex) => ex.id === c.id || ex.slug.toLowerCase() === c.slug.toLowerCase()
+      );
+      if (existingIdx >= 0 && mode !== 'create_new') {
+        categoryIdMap.set(c.id, _memoryCategories[existingIdx].id);
+        if (mode === 'update') {
+          _memoryCategories[existingIdx] = { ..._memoryCategories[existingIdx], ...c };
+          counts.categories++;
+        }
+      } else {
+        const newId = mode === 'create_new' ? `cat_${suffix}_${Math.random().toString(36).substring(2, 6)}` : c.id;
+        const newSlug = mode === 'create_new' ? `${c.slug}-${suffix}` : c.slug;
+        const catObj: Category = {
+          id: newId,
+          name: c.name,
+          slug: newSlug,
+          description: c.description,
+          parentId: c.parentId || null,
+          color: c.color || '#E11D48',
+          image: c.image,
+          seoTitle: c.seoTitle,
+          metaDescription: c.metaDescription,
+          order: c.order ?? 0,
+          createdAt: c.createdAt ? new Date(c.createdAt).toISOString() : new Date().toISOString(),
+        };
+        _memoryCategories.push(catObj);
+        categoryIdMap.set(c.id, newId);
+        counts.categories++;
+      }
+    }
+  }
+
+  // 4. Tags
+  const tagIdMap = new Map<string, string>();
+  if (Array.isArray(data.tags)) {
+    for (const t of data.tags) {
+      if (!t.id || !t.slug) continue;
+      const existingIdx = _memoryTags.findIndex(
+        (ex) => ex.id === t.id || ex.slug.toLowerCase() === t.slug.toLowerCase()
+      );
+      if (existingIdx >= 0 && mode !== 'create_new') {
+        tagIdMap.set(t.id, _memoryTags[existingIdx].id);
+        if (mode === 'update') {
+          _memoryTags[existingIdx] = { ..._memoryTags[existingIdx], ...t };
+          counts.tags++;
+        }
+      } else {
+        const newId = mode === 'create_new' ? `tag_${suffix}_${Math.random().toString(36).substring(2, 6)}` : t.id;
+        const newSlug = mode === 'create_new' ? `${t.slug}-${suffix}` : t.slug;
+        const tagObj: Tag = {
+          id: newId,
+          name: t.name,
+          slug: newSlug,
+          description: t.description,
+          createdAt: t.createdAt ? new Date(t.createdAt).toISOString() : new Date().toISOString(),
+        };
+        _memoryTags.push(tagObj);
+        tagIdMap.set(t.id, newId);
+        counts.tags++;
+      }
+    }
+  }
+
+  // 5. Media
+  if (Array.isArray(data.media)) {
+    for (const m of data.media) {
+      if (!m.id || !m.url) continue;
+      const existingIdx = _memoryMedia.findIndex((ex) => ex.id === m.id || ex.url === m.url);
+      if (existingIdx >= 0 && mode !== 'create_new') {
+        if (mode === 'update') {
+          _memoryMedia[existingIdx] = { ..._memoryMedia[existingIdx], ...m };
+          counts.media++;
+        }
+      } else {
+        const newId = mode === 'create_new' ? `med_${suffix}_${Math.random().toString(36).substring(2, 6)}` : m.id;
+        _memoryMedia.push({ ...m, id: newId });
+        counts.media++;
+      }
+    }
+  }
+
+  // 6. Pages
+  if (Array.isArray(data.pages)) {
+    for (const p of data.pages) {
+      if (!p.id || !p.slug) continue;
+      const existingIdx = _memoryPages.findIndex(
+        (ex) => ex.id === p.id || ex.slug.toLowerCase() === p.slug.toLowerCase()
+      );
+      if (existingIdx >= 0 && mode !== 'create_new') {
+        if (mode === 'update') {
+          _memoryPages[existingIdx] = { ..._memoryPages[existingIdx], ...p };
+          counts.pages++;
+        }
+      } else {
+        const newId = mode === 'create_new' ? `pag_${suffix}_${Math.random().toString(36).substring(2, 6)}` : p.id;
+        const newSlug = mode === 'create_new' ? `${p.slug}-${suffix}` : p.slug;
+        _memoryPages.push({ ...p, id: newId, slug: newSlug });
+        counts.pages++;
+      }
+    }
+  }
+
+  // 7. Posts
+  if (Array.isArray(data.posts)) {
+    for (const p of data.posts) {
+      if (!p.id || !p.slug) continue;
+      const existingIdx = _memoryPosts.findIndex(
+        (ex) => ex.id === p.id || ex.slug.toLowerCase() === p.slug.toLowerCase()
+      );
+
+      const mappedAuthorId = userIdMap.get(p.authorId) || _memoryUsers[0]?.id || 'usr_admin_01';
+      const mappedAuthor = _memoryUsers.find((u) => u.id === mappedAuthorId) || _memoryUsers[0];
+
+      let mappedCatId = categoryIdMap.get(p.categoryId) || p.categoryId;
+      let mappedCat = _memoryCategories.find((c) => c.id === mappedCatId) || _memoryCategories[0];
+
+      let mappedSubCatId = p.subCategoryId ? (categoryIdMap.get(p.subCategoryId) || p.subCategoryId) : null;
+      let mappedSubCat = mappedSubCatId ? _memoryCategories.find((c) => c.id === mappedSubCatId) : null;
+
+      // Extract tags
+      const postTagList: Tag[] = [];
+      if (Array.isArray(data.postTags)) {
+        const pTags = data.postTags.filter((pt: any) => pt.postId === p.id);
+        for (const pt of pTags) {
+          const resolvedTagId = tagIdMap.get(pt.tagId) || pt.tagId;
+          const foundTag = _memoryTags.find((t) => t.id === resolvedTagId);
+          if (foundTag) postTagList.push(foundTag);
+        }
+      } else if (Array.isArray(p.tags)) {
+        postTagList.push(...p.tags);
+      }
+
+      const postObj: Post = {
+        id: mode === 'create_new' ? `pst_${suffix}_${Math.random().toString(36).substring(2, 6)}` : p.id,
+        title: p.title,
+        slug: mode === 'create_new' ? `${p.slug}-${suffix}` : p.slug,
+        content: p.content || '',
+        excerpt: p.excerpt || '',
+        featuredImage: p.featuredImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&w=1200&q=80',
+        featuredImageCaption: p.featuredImageCaption,
+        authorId: mappedAuthorId,
+        author: mappedAuthor,
+        categoryId: mappedCat?.id || 'cat_culture',
+        category: mappedCat || { id: 'cat_culture', name: 'Culture', slug: 'culture', color: '#E11D48' },
+        subCategoryId: mappedSubCat?.id,
+        subCategory: mappedSubCat || undefined,
+        tagIds: postTagList.map((t) => t.id),
+        tags: postTagList,
+        status: p.status || 'published',
+        isFeatured: p.isFeatured ?? false,
+        isTrending: p.isTrending ?? false,
+        isEditorPick: p.isEditorPick ?? false,
+        views: p.views ?? 0,
+        likes: p.likes ?? 0,
+        readingTime: p.readingTime ?? 3,
+        publishedAt: p.publishedAt ? new Date(p.publishedAt).toISOString() : new Date().toISOString(),
+        scheduledAt: p.scheduledAt ? new Date(p.scheduledAt).toISOString() : undefined,
+        seoTitle: p.seoTitle,
+        metaDescription: p.metaDescription,
+        focusKeyword: p.focusKeyword,
+        canonicalUrl: p.canonicalUrl,
+        ogImage: p.ogImage,
+        faqs: p.faqs || [],
+        relatedPostIds: p.relatedPostIds || [],
+        allowComments: p.allowComments ?? true,
+        blocks: p.blocks || [],
+        createdAt: p.createdAt ? new Date(p.createdAt).toISOString() : new Date().toISOString(),
+        updatedAt: p.updatedAt ? new Date(p.updatedAt).toISOString() : new Date().toISOString(),
+      };
+
+      if (existingIdx >= 0 && mode !== 'create_new') {
+        if (mode === 'update') {
+          _memoryPosts[existingIdx] = { ..._memoryPosts[existingIdx], ...postObj };
+          counts.posts++;
+        }
+      } else {
+        _memoryPosts.push(postObj);
+        counts.posts++;
+      }
+    }
+  }
+
+  // 8. Comments
+  if (Array.isArray(data.comments)) {
+    for (const c of data.comments) {
+      _memoryComments.push(c);
+      counts.comments++;
+    }
+  }
+
+  // 9. Menus
+  if (Array.isArray(data.menus)) {
+    for (const m of data.menus) {
+      _memoryMenus.push(m);
+      counts.menus++;
+    }
+  }
+
+  // 10. Advertisements
+  if (Array.isArray(data.advertisements)) {
+    for (const a of data.advertisements) {
+      _memoryAds.push(a);
+      counts.advertisements++;
+    }
+  }
+
+  // 11. Newsletters
+  if (Array.isArray(data.newsletters)) {
+    for (const n of data.newsletters) {
+      _memoryNewsletters.push(n);
+      counts.newsletters++;
+    }
+  }
+
+  // 12. Videos
+  if (Array.isArray(data.videos)) {
+    for (const v of data.videos) {
+      _memoryVideos.push(v);
+      counts.videos++;
+    }
+  }
+
+  // 13. Activity Logs
+  if (Array.isArray(data.activityLogs)) {
+    for (const l of data.activityLogs) {
+      _memoryLogs.push(l);
+      counts.activityLogs++;
+    }
+  }
+
+  // 14. Notifications
+  if (Array.isArray(data.notifications)) {
+    for (const notif of data.notifications) {
+      _memoryNotifications.push(notif);
+      counts.notifications++;
+    }
+  }
+
+  // Save changes to disk
+  saveMemoryStoreToDisk();
+
+  return counts;
+}
 
 // ----------------------------------------------------
 // VALIDATION HELPERS
@@ -516,8 +919,8 @@ export async function getPosts(params: GetPostsParams = {}): Promise<Post[]> {
       updatedAt: p.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getPosts query failed, falling back to INITIAL_POSTS:', error);
-    let filtered = [...INITIAL_POSTS];
+    console.warn('getPosts query failed, falling back to active memory store:', error);
+    let filtered = [..._memoryPosts];
     if (params.status && params.status !== 'all') {
       filtered = filtered.filter((p) => p.status === params.status);
     }
@@ -818,8 +1221,8 @@ export async function getPostBySlug(slugOrId: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getPostBySlug failed, falling back to INITIAL_POSTS:', error);
-    const matched = INITIAL_POSTS.find(
+    console.warn('getPostBySlug failed, falling back to active memory store:', error);
+    const matched = _memoryPosts.find(
       (p) => p.slug === slugOrId || p.id === slugOrId
     );
     return matched || null;
@@ -1414,8 +1817,8 @@ export async function getCategories() {
       };
     });
   } catch (error) {
-    console.warn('getCategories query failed, falling back to INITIAL_CATEGORIES:', error);
-    return INITIAL_CATEGORIES;
+    console.warn('getCategories query failed, falling back to active memory store:', error);
+    return _memoryCategories;
   }
 }
 
@@ -1754,8 +2157,8 @@ export async function getTags() {
       createdAt: t.createdAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getTags failed, falling back to INITIAL_TAGS:', error);
-    return INITIAL_TAGS;
+    console.warn('getTags failed, falling back to active memory store:', error);
+    return _memoryTags;
   }
 }
 
@@ -1885,8 +2288,8 @@ export async function getMedia() {
       createdAt: m.createdAt.toISOString(),
     }));
   } catch (error) {
-    console.error('getMedia failed:', error);
-    throw new Error('Database query for media failed', { cause: error });
+    console.warn('getMedia notice (using active memory store):', error);
+    return _memoryMedia;
   }
 }
 
@@ -2058,8 +2461,8 @@ export async function getPages() {
       updatedAt: p.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getPages failed, falling back to INITIAL_PAGES:', error);
-    return INITIAL_PAGES;
+    console.warn('getPages failed, falling back to active memory store:', error);
+    return _memoryPages;
   }
 }
 
@@ -2090,8 +2493,8 @@ export async function getPageById(id: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getPageById failed, falling back to INITIAL_PAGES:', error);
-    const matched = INITIAL_PAGES.find((page) => page.id === id);
+    console.warn('getPageById failed, falling back to active memory store:', error);
+    const matched = _memoryPages.find((page) => page.id === id);
     return matched || null;
   }
 }
@@ -2123,8 +2526,8 @@ export async function getPageBySlug(slug: string) {
       updatedAt: p.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getPageBySlug failed, falling back to INITIAL_PAGES:', error);
-    const matched = INITIAL_PAGES.find(
+    console.warn('getPageBySlug failed, falling back to active memory store:', error);
+    const matched = _memoryPages.find(
       (page) => page.slug.toLowerCase() === slug.toLowerCase().trim()
     );
     return matched || null;
@@ -2292,8 +2695,8 @@ export async function getUsers() {
       updatedAt: u.updatedAt.toISOString(),
     }));
   } catch (error) {
-    console.warn('getUsers failed, falling back to INITIAL_USERS:', error);
-    return INITIAL_USERS;
+    console.warn('getUsers failed, falling back to active memory store:', error);
+    return _memoryUsers;
   }
 }
 
@@ -2345,8 +2748,8 @@ export async function getUserById(id: string) {
       updatedAt: u.updatedAt.toISOString(),
     };
   } catch (error) {
-    console.warn('getUserById failed, falling back to INITIAL_USERS:', error);
-    const fallbackUser = INITIAL_USERS.find((usr) => usr.id === id);
+    console.warn('getUserById failed, falling back to active memory store:', error);
+    const fallbackUser = _memoryUsers.find((usr) => usr.id === id);
     if (fallbackUser) return fallbackUser;
     if (id === 'usr_admin_01') {
       return {
@@ -2760,8 +3163,8 @@ export async function getSettings() {
     }
     return settingsObj;
   } catch (error) {
-    console.warn('getSettings failed, falling back to DEFAULT_SITE_SETTINGS:', error);
-    return { ...DEFAULT_SITE_SETTINGS };
+    console.warn('getSettings failed, falling back to active memory store:', error);
+    return { ..._memorySettings };
   }
 }
 
