@@ -1,0 +1,6 @@
+{
+  "name": "Naya Andaaz",
+  "description": "Modern News, Magazine & Lifestyle Content Management System with full WordPress-style CMS and rich frontend.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

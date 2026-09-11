@@ -1,0 +1,37 @@
+import { redirect } from 'next/navigation';
+import { getCurrentUser, hasPermission } from '@/lib/auth';
+import { getPosts } from '@/db/repository';
+import { EditorLayoutClient } from '@/components/editor/EditorLayoutClient';
+
+export const dynamic = 'force-dynamic';
+
+export default async function EditorLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const user = await getCurrentUser();
+
+  if (!user) {
+    redirect('/sign-in?callbackUrl=/editor');
+  }
+
+  if (!hasPermission(user.role, 'EDITOR')) {
+    if ((user.role || '').toUpperCase() === 'AUTHOR') {
+      redirect('/author');
+    }
+    redirect('/account/profile');
+  }
+
+  const allPosts = await getPosts({ limit: 500 }).catch(() => []);
+  const pendingReviewCount = Array.isArray(allPosts)
+    ? allPosts.filter((p) => p.status === 'pending').length
+    : 0;
+
+  return (
+    <EditorLayoutClient user={user} pendingReviewCount={pendingReviewCount}>
+      {children}
+    </EditorLayoutClient>
+  );
+}
+
