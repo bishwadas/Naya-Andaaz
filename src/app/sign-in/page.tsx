@@ -493,6 +493,35 @@ export default function SignInPage() {
                 </>
               )}
             </button>
+
+            {/* Quick Demo & Admin Login Credentials */}
+            <div className="pt-4 border-t border-stone-200">
+              <div className="text-xs font-semibold uppercase tracking-wider text-stone-500 mb-2">
+                Default Credentials
+              </div>
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 text-xs text-stone-600 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-stone-800">Admin:</span>{' '}
+                    <span className="font-mono text-pink-700">admin@nayaandaaz.com</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('admin@nayaandaaz.com');
+                      setPassword('nayaandaaz@168');
+                      setError(null);
+                    }}
+                    className="text-[11px] font-bold text-pink-600 hover:text-pink-700 bg-pink-50 hover:bg-pink-100 px-2 py-1 rounded-md transition"
+                  >
+                    Auto-Fill
+                  </button>
+                </div>
+                <div className="text-[11px] text-stone-500">
+                  Password: <span className="font-mono font-bold text-stone-700">nayaandaaz@168</span> (or <span className="font-mono text-stone-700">AdminPass2026!</span>)
+                </div>
+              </div>
+            </div>
           </form>
         )}
 
