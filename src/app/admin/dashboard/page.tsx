@@ -20,10 +20,10 @@ export default async function AdminDashboardPage() {
 
   const [metrics, postsRes, categories, comments, users] = await Promise.all([
     getDashboardMetrics().catch(() => null),
-    getPosts({ limit: 20 }),
-    getCategories(),
-    getComments(),
-    getUsers(),
+    getPosts({ limit: 20 }).catch(() => ({ posts: [], total: 0 })),
+    getCategories().catch(() => []),
+    getComments().catch(() => []),
+    getUsers().catch(() => []),
   ]);
 
   const initialPosts = Array.isArray(postsRes) ? postsRes : (postsRes as any)?.posts || [];

@@ -23,8 +23,10 @@ export default async function EditorLayout({
     redirect('/account/profile');
   }
 
-  const allPosts = await getPosts({ limit: 500 });
-  const pendingReviewCount = allPosts.filter((p) => p.status === 'pending').length;
+  const allPosts = await getPosts({ limit: 500 }).catch(() => []);
+  const pendingReviewCount = Array.isArray(allPosts)
+    ? allPosts.filter((p) => p.status === 'pending').length
+    : 0;
 
   return (
     <EditorLayoutClient user={user} pendingReviewCount={pendingReviewCount}>

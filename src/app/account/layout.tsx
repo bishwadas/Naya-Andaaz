@@ -5,6 +5,7 @@ import { getCategories, getSettings, getPrimaryMenuItems } from '@/db/repository
 import { Navbar } from '@/components/public/Navbar';
 import { Footer } from '@/components/public/Footer';
 import { SiteSettings } from '@/types';
+import { DEFAULT_SITE_SETTINGS, INITIAL_CATEGORIES } from '@/lib/constants';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +20,11 @@ export default async function AccountLayout({
   }
 
   const [categories, settings, primaryMenuItems] = await Promise.all([
-    getCategories(),
-    getSettings().then((s) => s as unknown as SiteSettings),
-    getPrimaryMenuItems(),
+    getCategories().catch(() => INITIAL_CATEGORIES),
+    getSettings()
+      .then((s) => (s ? (s as unknown as SiteSettings) : DEFAULT_SITE_SETTINGS))
+      .catch(() => DEFAULT_SITE_SETTINGS),
+    getPrimaryMenuItems().catch(() => []),
   ]);
 
   return (
